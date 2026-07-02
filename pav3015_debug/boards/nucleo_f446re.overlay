@@ -1,0 +1,99 @@
+// =============================================================================
+// Device Tree Overlay — NUCLEO-F446RE (Fixed & Unified)
+// Resolves GPIO LED vs SPI1 pin layout contentions and corrects node references.
+// Rebuild via: west build -b nucleo_f446re -- -DEXTRA_DTC_FLAGS="-Wno-unit_address_vs_reg"
+// =============================================================================
+
+/ {
+    // Re-define LEDs on non-conflicting pins (Moving off PA5/PA6 SPI1 lines)
+    leds {
+        compatible = "gpio-leds";
+        green_led: led_0 {
+            gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>; // Moved to PB0 (Arduino D3 header)
+            label = "Green Status LED";
+        };
+        yellow_led: led_1 {
+            gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>; // Moved to PB1 (Arduino D4 header)
+            label = "Yellow Observer LED";
+        };
+    };
+
+    aliases {
+        sw0 = &user_button;   // Fixed reference to standard Nucleo blue button
+        led0 = &green_led;
+        led1 = &yellow_led;
+        i2c-sens = &i2c1;          // Fixed identifier to match C++ sensor.hpp macro
+        spi-adc = &spi1;
+        log-uart = &usart2;
+        uart-vcp = &usart2;
+    };
+};
+
+// Override properties on the blue user button node natively declared by the board
+&user_button {
+    gpios = <&gpioc 13 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+    status = "okay";
+};
+
+// ── USART2 — ST-Link VCP DMA Configuration ──────────────────────────────────
+&usart2 {
+    status = "okay";
+    current-speed = <921600>;
+    
+    // Configured for STM32F446xx DMA1 Map
+    dmas = <&dma1 6 4 0x10440 0x03>,   // Channel 4, Stream 6 (TX)
+           <&dma1 5 4 0x10480 0x03>;   // Channel 4, Stream 5 (RX)
+    dma-names = "tx", "rx";
+};
+
+// ── DMA1 — Subsystem Activation ─────────────────────────────────────────────
+&dma1 {
+    status = "okay";
+};
+
+// ── I2C1 — Shared Sensor Bus (400 kHz) ──────────────────────────────────────
+&i2c1 {
+    status = "okay";
+    clock-frequency = <I2C_BITRATE_FAST>; // 400 kHz
+    pinctrl-0 = <&i2c1_scl_pb8 &i2c1_sda_pb9>;
+    pinctrl-names = "default";
+
+    pav3015: pav3015@28 {
+        compatible = "i2c-device";
+        reg = <0x28>;
+        label = "PAV3015";
+    };
+
+    bme280: bme280@76 {
+        compatible = "bosch,bme280";
+        reg = <0x76>;
+        label = "BME280";
+    };
+
+    shtc3: shtc3@70 {
+        compatible = "sensirion,shtc3";
+        reg = <0x70>;
+        label = "SHTC3";
+    };
+
+    lps22hb: lps22hb@5c {
+        compatible = "st,lps22hb-press";
+        reg = <0x5D>;
+        label = "LPS22HB";
+    };
+};
+
+// ── SPI1 — ADS1118 Isolation ────────────────────────────────────────────────
+&spi1 {
+    status = "okay";
+    pinctrl-0 = <&spi1_sck_pa5 &spi1_miso_pa6 &spi1_mosi_pa7>;
+    pinctrl-names = "default";
+    cs-gpios = <&gpiob 6 GPIO_ACTIVE_LOW>; // Chip Select Pin: PB6 (Arduino D10)
+
+    ads1118: ads1118@0 {
+        compatible = "ti,ads1118";
+        reg = <0>;
+        spi-max-frequency = <4000000>; // 4 MHz clock speed
+        label = "ADS1118";
+    };
+};

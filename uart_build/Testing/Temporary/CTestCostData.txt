@@ -1,0 +1,48 @@
+gpio_test_NOT_BUILT 0 0
+RingBufferTest.InitialStateIsEmpty 2 0.00370101
+RingBufferTest.PushPopSingleElement 2 0.00490683
+RingBufferTest.PopOnEmptyReturnsNullopt 2 0.00335721
+RingBufferTest.FillToCapacity 2 0.00392241
+RingBufferTest.OverflowCounterIncrements 2 0.00316649
+RingBufferTest.PeekReturnsOldestElementWithoutPopping 2 0.00420241
+RingBufferTest.ResetOverflowClearsCounter 2 0.00347052
+RingBufferTest.WrapAroundBoundary 2 0.00447662
+RingBufferTest.MultipleWrapCycles 2 0.00330941
+RingBufferTest.ResetClearsAll 2 0.00381843
+RingBufferTest.FIFOOrdering 2 0.0031865
+RingBufferTest.SizeTracksCorrectly 2 0.00389673
+RingBufferTypes.NonTrivialStruct 2 0.00299645
+RingBufferTypes.ByteBuffer 2 0.00383344
+RingBufferConcurrent.ProducerConsumer1000 2 0.00362128
+RingBufferConcurrent.OverflowInjection 2 0.00460097
+DmaUartTest.InitialState 2 0.00358992
+DmaUartTest.LogEnqueuesPacket 2 0.00417018
+DmaUartTest.DrainProducesOutput 2 0.00341949
+DmaUartTest.OutputContainsTimestamp 2 0.00395054
+DmaUartTest.OutputContainsMessage 2 0.00294624
+DmaUartTest.AllLogLevelStrings 2 0.0040257
+DmaUartTest.OutputEndsWithCRLF 2 0.00324227
+DmaUartTest.MultiplePacketFIFOOrder 2 0.00375385
+DmaUartTest.PartialDrainWhenBufferTooSmall 2 0.00346213
+DmaUartTest.PacketRetainedWhenBufferTooSmall 2 0.00369299
+DmaUartTest.DrainOnEmptyReturnsZero 2 0.0037017
+DmaUartTest.TxOverflowCounter 2 0.00371256
+DmaUartTest.TxOverflowMultiple 2 0.00351317
+DmaUartTest.OverflowPersistsAcrossDrain 2 0.00334039
+DmaUartTest.RxPushPopRoundTrip 2 0.00381063
+DmaUartTest.RxPopEmptyReturnsNullopt 2 0.00300864
+DmaUartTest.RxFIFOOrder 2 0.00399725
+DmaUartTest.RxOverflowCounter 2 0.00323344
+LogPacketTest.MakeTruncatesLongMessage 2 0.0040239
+LogPacketTest.MakeShortMessage 2 0.0027425
+LogPacketTest.MakeEmptyMessage 2 0.00388398
+DmaUartThroughput.OneKhzLogRate1000Packets 2 0.00328183
+UartMockTest.StubsAndSimulationHelpers 2 0.0042647
+i2c_test_NOT_BUILT 0 0
+spi_test_NOT_BUILT 0 0
+crc_test_NOT_BUILT 0 0
+---
+gpio_test_NOT_BUILT
+i2c_test_NOT_BUILT
+spi_test_NOT_BUILT
+crc_test_NOT_BUILT

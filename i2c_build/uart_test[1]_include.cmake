@@ -1,0 +1,5 @@
+if(EXISTS "/home/dhana-inc5839/zephyrproject/zephyr_hce_task/hce_drivers/i2c_build/uart_test[1]_tests.cmake")
+  include("/home/dhana-inc5839/zephyrproject/zephyr_hce_task/hce_drivers/i2c_build/uart_test[1]_tests.cmake")
+else()
+  add_test(uart_test_NOT_BUILT uart_test_NOT_BUILT)
+endif()

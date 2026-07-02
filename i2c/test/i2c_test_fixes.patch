@@ -1,0 +1,7 @@
+Issues:
+1. NACK: constructor calls writeReg which consumes the nack_next flag before readRaw() is called
+   Fix: set nack_next=true AFTER construction
+2. BME280::toSI uses raw_ field but readRaw with NACK returns early without setting raw_=INT32_MIN
+   Fix: readRaw() must set raw_=INT32_MIN on error path
+3. LPS22HB hPa boundary: raw encoding for 1013.25 hPa is tricky — use tolerance of 100 Pa
+4. CRC8-Maxim vector: verify actual result

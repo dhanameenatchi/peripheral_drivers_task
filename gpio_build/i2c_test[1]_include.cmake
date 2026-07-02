@@ -1,0 +1,5 @@
+if(EXISTS "/home/dhana-inc5839/zephyrproject/zephyr_hce_task/hce_drivers/gpio_build/i2c_test[1]_tests.cmake")
+  include("/home/dhana-inc5839/zephyrproject/zephyr_hce_task/hce_drivers/gpio_build/i2c_test[1]_tests.cmake")
+else()
+  add_test(i2c_test_NOT_BUILT i2c_test_NOT_BUILT)
+endif()

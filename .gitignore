@@ -1,0 +1,33 @@
+# Build folders
+build/
+build_*/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+
+# Ninja
+.ninja*
+build.ninja
+
+# Coverage
+*.gcda
+*.gcno
+*.info
+coverage_html/
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Temporary
+*.swp

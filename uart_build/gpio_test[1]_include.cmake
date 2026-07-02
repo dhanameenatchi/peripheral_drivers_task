@@ -1,0 +1,5 @@
+if(EXISTS "/home/dhana-inc5839/zephyrproject/zephyr_hce_task/hce_drivers/uart_build/gpio_test[1]_tests.cmake")
+  include("/home/dhana-inc5839/zephyrproject/zephyr_hce_task/hce_drivers/uart_build/gpio_test[1]_tests.cmake")
+else()
+  add_test(gpio_test_NOT_BUILT gpio_test_NOT_BUILT)
+endif()
