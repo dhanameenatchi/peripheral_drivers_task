@@ -136,6 +136,7 @@ hce_drivers/
 
 ```bash
 cd ~/zephyrproject/zephyr_hce_task/hce_drivers
+rm -rf build
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
 make -C build -j$(nproc)
 ```

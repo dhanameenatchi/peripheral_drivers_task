@@ -1,8 +1,8 @@
 #include "shtc3_driver.hpp"
 #include <cmath>
+#include <zephyr/logging/log.h>
 
 #ifdef ZEPHYR_BUILD
-#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(shtc3_driver, LOG_LEVEL_INF);
 #else
 #include <zephyr/logging/log.h>

@@ -1,7 +1,8 @@
 #include "lps22hb_driver.hpp"
 #include <cmath>
-#ifdef ZEPHYR_BUILD
 #include <zephyr/logging/log.h>
+
+#ifdef ZEPHYR_BUILD
 LOG_MODULE_REGISTER(lps22hb_driver, LOG_LEVEL_INF);
 #else
 #include <zephyr/logging/log.h>

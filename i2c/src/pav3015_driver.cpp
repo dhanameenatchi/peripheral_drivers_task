@@ -1,7 +1,8 @@
 #include "pav3015_driver.hpp"
 #include <cmath>
-#ifdef ZEPHYR_BUILD
 #include <zephyr/logging/log.h>
+
+#ifdef ZEPHYR_BUILD
 LOG_MODULE_REGISTER(pav3015_driver, LOG_LEVEL_INF);
 #else
 #include <zephyr/logging/log.h>

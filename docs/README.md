@@ -17,12 +17,45 @@ Five peripheral driver modules implementing Observer, Factory Method, and Strate
 ## Quick Start — Run Tests on PC (No Hardware)
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+#For all modules run
+cmake -B build -DCMAKE_BUILD_TYPE=Debug 
 make -C build -j$(nproc)
 ./build/gpio_test && ./build/uart_test && ./build/i2c_test \
   && ./build/spi_test && ./build/crc_test
 ```
+```bash
 
+#Host side Testing
+
+cd ~/zephyrproject/zephyr_hce_task/hce_drivers
+
+cmake --build build --target gpio_test
+./build/gpio_test
+cmake --build build --target gpio_coverage
+
+cmake --build build --target uart_test
+./build/uart_test
+cmake --build build --target uart_bench
+./build/uart_bench
+
+cmake --build build --target i2c_test
+./build/i2c_test
+
+cmake --build build --target spi_test
+./build/spi_test
+
+cmake --build build --target crc_test
+./build/crc_test
+
+#Hardware Testing
+rm -rf build_i2c
+west build -b nucleo_f446re zephyr_app -d build_i2c -- -DCONF_FILE=config/prj_i2c.conf
+west flash --build-dir build_i2c
+
+rm -rf build_spi
+west build -b nucleo_f446re zephyr_app -d build_spi -- -DCONF_FILE=config/prj_spi.conf
+west flash --build-dir build_spi
+```
 ## Quick Start — Flash to NUCLEO-F446RE
 
 ```bash

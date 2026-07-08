@@ -84,7 +84,7 @@ leds {
 
     lps22hb: lps22hb@5c {
         compatible = "st,lps22hb-press";
-        reg = <0x5D>;
+        reg = <0x5C>;
         label = "LPS22HB";
     };
 };

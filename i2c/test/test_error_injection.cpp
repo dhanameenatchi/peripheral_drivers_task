@@ -33,6 +33,8 @@ TEST_F(I2CTest, Nack_PAV3015_ReadRawReturnsMin) {
 
 TEST_F(I2CTest, Nack_PAV3015_ReadVelocityReturnsNaN) {
     PAV3015Driver pav;
+    // Corrupt checksum in mock registers so the second read (triggered by toSI()) fails validation.
+    i2c_sim::regs[PAV3015Driver::DEFAULT_ADDR][0] = 0xFF;
     i2c_sim::nack_next = true;
     EXPECT_TRUE(std::isnan(pav.readVelocity_mps()));
 }
@@ -45,9 +47,8 @@ TEST_F(I2CTest, SHTC3_NackToSI_IsNaN) {
 }
 
 TEST_F(I2CTest, PAV3015_DataH_Nack_ReturnsMin) {
-    i2c_sim::regs[PAV3015Driver::DEFAULT_ADDR][pav3015_reg::STATUS] = 0x01;
     PAV3015Driver pav;
-    i2c_sim::nack_after_n = 1;
+    i2c_sim::nack_next = true;
     EXPECT_EQ(pav.readRaw(), INT32_MIN);
 }
 

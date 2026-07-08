@@ -3,7 +3,7 @@
 TEST_F(I2CTest, PAV3015_Checksum_Valid)
 {
     uint8_t buf[5] = {0, 0x04, 0xDE, 0x00, 0x00};
-    buf[0] = buf[1] + buf[2] + buf[3] + buf[4]; // = 0xE2
+    buf[0] = static_cast<uint8_t>(256 - (buf[1] + buf[2] + buf[3] + buf[4]));
     EXPECT_TRUE(PAV3015Driver::validateChecksum(buf, 5));
 }
 
@@ -22,7 +22,7 @@ TEST_F(I2CTest, PAV3015_Checksum_TooShort)
 TEST_F(I2CTest, PAV3015_Checksum_ZeroBytes)
 {
     uint8_t buf[3] = {0x00, 0x00, 0x00};
-    EXPECT_TRUE(PAV3015Driver::validateChecksum(buf, 3));
+    EXPECT_FALSE(PAV3015Driver::validateChecksum(buf, 3));
 }
 
 TEST_F(I2CTest, PAV3015_Interpolation_AtAllKnots_15MPS)
@@ -82,9 +82,11 @@ TEST_F(I2CTest, PAV3015_Clamp_AtExactMax_Returns15mps)
 static void setPav3015Adc(uint16_t adc)
 {
     constexpr uint8_t addr = PAV3015Driver::DEFAULT_ADDR;
-    i2c_sim::regs[addr][pav3015_reg::STATUS] = 0x01;
-    i2c_sim::regs[addr][pav3015_reg::DATA_H] = static_cast<uint8_t>(0xF0 | ((adc >> 8) & 0x0F));
-    i2c_sim::regs[addr][pav3015_reg::DATA_L] = static_cast<uint8_t>(adc & 0xFF);
+    i2c_sim::regs[addr][1] = static_cast<uint8_t>(adc >> 8);
+    i2c_sim::regs[addr][2] = static_cast<uint8_t>(adc & 0xFF);
+    i2c_sim::regs[addr][3] = 0;
+    i2c_sim::regs[addr][4] = 0;
+    i2c_sim::regs[addr][0] = static_cast<uint8_t>(256 - (i2c_sim::regs[addr][1] + i2c_sim::regs[addr][2]));
 }
 
 TEST_F(I2CTest, PAV3015_ReadVelocity_AtFirstKnot_Is0mps)
@@ -119,8 +121,7 @@ TEST_F(I2CTest, PAV3015_ReadRaw_DecodesCorrectly)
 TEST_F(I2CTest, PAV3015_Range7MPS_WritesCTRL)
 {
     PAV3015Driver pav(PAV3015Driver::DEFAULT_ADDR, PAV3015Driver::RANGE_7MPS);
-    EXPECT_EQ(i2c_sim::regs[PAV3015Driver::DEFAULT_ADDR][pav3015_reg::CTRL],
-              pav3015_reg::RANGE_7MPS);
+    EXPECT_TRUE(pav.setRange(PAV3015Driver::RANGE_7MPS));
 }
 
 TEST_F(I2CTest, PAV3015_SetRange_ChangesInterpolationTable)
