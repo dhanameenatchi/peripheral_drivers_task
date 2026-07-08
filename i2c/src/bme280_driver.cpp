@@ -1,6 +1,8 @@
 #ifdef ZEPHYR_BUILD
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bme280_driver, LOG_LEVEL_INF);
+#else
+#include <zephyr/logging/log.h>
 #endif
 
 #include "bme280_driver.hpp"

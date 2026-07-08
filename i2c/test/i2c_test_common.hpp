@@ -36,5 +36,11 @@ protected:
         i2c_sim::nack_next = false;
         i2c_sim::nack_after_n = -1;
         i2c_sim::transaction_history.clear();
+
+        // Pre-populate WHO_AM_I / Chip ID registers for default and custom addresses
+        i2c_sim::regs[0x76][0xD0] = 0x60; // BME280 default
+        i2c_sim::regs[0x77][0xD0] = 0x60; // BME280 custom
+        i2c_sim::regs[0x5C][0x0F] = 0xB1; // LPS22HB default
+        i2c_sim::regs[0x5D][0x0F] = 0xB1; // LPS22HB custom
     }
 };

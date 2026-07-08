@@ -16,8 +16,8 @@
 // ---------------------------------------------------------------------------
 namespace pins {
     constexpr gpio_dt_spec USER_BUTTON = { .port = nullptr, .pin = 13, .dt_flags = 0 };
-    constexpr gpio_dt_spec LED_GREEN   = { .port = nullptr, .pin =  5, .dt_flags = 0 };
-    constexpr gpio_dt_spec LED_YELLOW  = { .port = nullptr, .pin =  6, .dt_flags = 0 };
+    constexpr gpio_dt_spec LED_GREEN   = { .port = nullptr, .pin =  0, .dt_flags = 0 };
+    constexpr gpio_dt_spec LED_YELLOW  = { .port = nullptr, .pin =  1, .dt_flags = 0 };
 }
 
 // ---------------------------------------------------------------------------
