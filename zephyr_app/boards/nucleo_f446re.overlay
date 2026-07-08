@@ -5,22 +5,28 @@
 // =============================================================================
 
 / {
-    // Re-define LEDs on non-conflicting pins (Moving off PA5/PA6 SPI1 lines)
-    leds {
-        compatible = "gpio-leds";
-        green_led: led_0 {
-            gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>; // Moved to PB0 (Arduino D3 header)
-            label = "Green Status LED";
-        };
-        yellow_led: led_1 {
-            gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>; // Moved to PB1 (Arduino D4 header)
-            label = "Yellow Observer LED";
-        };
+    // Re-define LEDs (Keeping onboard LED PA5 and adding external yellow LED PB1)
+    //leds {
+      //  compatible = "gpio-leds";
+        //green_led: led_0 {
+          //  gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>; // Onboard LD2 green LED (PA5)
+            //label = "Green Status LED";
+        //};
+        //yellow_led: led_1 {
+         //   gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>; // External yellow LED (PB1)
+         //   label = "Yellow Observer LED";
+        //};
+    //};
+leds {
+    compatible = "gpio-leds";
+    yellow_led: led_1 {
+        gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>;
+        label = "Yellow Observer LED";
     };
-
+};
     aliases {
         sw0 = &user_button;   // Fixed reference to standard Nucleo blue button
-        led0 = &green_led;
+        //led0 = &green_led;
         led1 = &yellow_led;
         i2c-sens = &i2c1;          // Fixed identifier to match C++ sensor.hpp macro
         spi-adc = &spi1;

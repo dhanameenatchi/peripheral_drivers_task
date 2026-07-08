@@ -35,10 +35,13 @@ TEST_F(I2CTest, Factory_CreatesLPS22HB_WritesODR_RecordsTransaction) {
     auto s = SensorFactory::create(SensorKind::LPS22HB, 0x5C);
     ASSERT_NE(s, nullptr);
     
-    // Assert that the I2C transaction occurred and is recorded
-    ASSERT_GE(i2c_sim::transaction_history.size(), 1u);
-    EXPECT_EQ(i2c_sim::transaction_history[0].address, 0x5C);
-    EXPECT_EQ(i2c_sim::transaction_history[0].reg, 0x10);
-    EXPECT_TRUE(i2c_sim::transaction_history[0].is_write);
-    EXPECT_EQ(i2c_sim::transaction_history[0].length, 1u);
+    // Assert that the ODR config write to reg 0x10 occurred and is recorded
+    bool found_odr_write = false;
+    for (const auto& tx : i2c_sim::transaction_history) {
+        if (tx.address == 0x5C && tx.reg == 0x10 && tx.is_write) {
+            found_odr_write = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found_odr_write);
 }

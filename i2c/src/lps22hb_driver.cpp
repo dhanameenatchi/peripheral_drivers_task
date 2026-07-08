@@ -3,6 +3,8 @@
 #ifdef ZEPHYR_BUILD
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(lps22hb_driver, LOG_LEVEL_INF);
+#else
+#include <zephyr/logging/log.h>
 #endif
 
 LPS22HbDriver::LPS22HbDriver(uint8_t addr, uint8_t odr)

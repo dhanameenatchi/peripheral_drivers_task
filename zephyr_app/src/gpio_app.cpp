@@ -11,22 +11,21 @@ LOG_MODULE_REGISTER(gpio_app, LOG_LEVEL_INF);
 // led0 → PA5  (LD2 green LED)
 static const struct gpio_dt_spec btn_spec =
     GPIO_DT_SPEC_GET(DT_ALIAS(sw0),  gpios);
-static const struct gpio_dt_spec led_spec =
+static const struct gpio_dt_spec led0_spec =
     GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+static const struct gpio_dt_spec led1_spec =
+    GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
 
 // ── Static module objects (no heap) ──────────────────────────────────────────
-// Defined here so debounce_expiry can reach g_bus via CONTAINER_OF pattern.
-// We embed the k_timer INSIDE a wrapper struct so CONTAINER_OF works cleanly.
-
 struct GpioAppContext {
     ButtonEventBus    bus;
-    LedToggleListener led_listener;
+    LedToggleListener led0_listener;
+    LedToggleListener led1_listener;
     UartLogListener   log_listener;
     struct k_timer    debounce_timer;
 
-    // Constructor: gpio_dt_spec values captured before Zephyr init runs
-    GpioAppContext(const gpio_dt_spec& btn, const gpio_dt_spec& led)
-        : bus(btn), led_listener(led), log_listener() {}
+    GpioAppContext(const gpio_dt_spec& btn, const gpio_dt_spec& led0, const gpio_dt_spec& led1)
+        : bus(btn), led0_listener(led0), led1_listener(led1), log_listener() {}
 };
 
 // Single static instance — safe because gpio_app_init() is called once
@@ -69,24 +68,29 @@ static void button_isr(const struct device* dev,
 // ── Public init ──────────────────────────────────────────────────────────────
 void gpio_app_init(void)
 {
-    LOG_INF("GPIO init: Button=PC13(sw0), GreenLED=PA5(led0)");
+    LOG_INF("GPIO init: Button=PC13(sw0), OnboardGreenLED=PA5(led0), ExternalYellowLED=PB1(led1)");
 
     // Validate DT devices are ready
     if (!gpio_is_ready_dt(&btn_spec)) {
         LOG_ERR("Button GPIO device not ready");
         return;
     }
-    if (!gpio_is_ready_dt(&led_spec)) {
-        LOG_ERR("LED GPIO device not ready");
+    if (!gpio_is_ready_dt(&led0_spec)) {
+        LOG_ERR("LED0 GPIO device not ready");
+        return;
+    }
+    if (!gpio_is_ready_dt(&led1_spec)) {
+        LOG_ERR("LED1 GPIO device not ready");
         return;
     }
 
     // Allocate context (static — lives for the lifetime of the app)
-    static GpioAppContext ctx(btn_spec, led_spec);
+    static GpioAppContext ctx(btn_spec, led0_spec, led1_spec);
     g_ctx = &ctx;
 
     // Subscribe observers to the bus
-    ctx.bus.subscribe(&ctx.led_listener);
+    ctx.bus.subscribe(&ctx.led0_listener);
+    ctx.bus.subscribe(&ctx.led1_listener);
     ctx.bus.subscribe(&ctx.log_listener);
 
     // Configure button GPIO — input with internal pull-up (B1 is active LOW)

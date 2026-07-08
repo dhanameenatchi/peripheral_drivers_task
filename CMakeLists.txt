@@ -28,6 +28,9 @@ function(add_hce_test NAME SRC INCLUDES)
     gtest_discover_tests(${NAME})
 endfunction()
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# GPIO
+# ═══════════════════════════════════════════════════════════════════════════════
 add_hce_test(gpio_test
     gpio/test/gpio_test.cpp
     "${CMAKE_SOURCE_DIR}/gpio/include"
@@ -37,7 +40,9 @@ target_sources(gpio_test PRIVATE
     gpio/src/listeners.cpp
 )
 
-# ─── UART ─────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# UART
+# ═══════════════════════════════════════════════════════════════════════════════
 add_hce_test(uart_test
     uart/test/uart_test.cpp
     "${CMAKE_SOURCE_DIR}/uart/include"
@@ -45,9 +50,10 @@ add_hce_test(uart_test
 target_sources(uart_test PRIVATE
     uart/src/dma_uart.cpp
 )
+
 # ─── UART Throughput Benchmark ────────────────────────────────────────────────
 add_executable(uart_bench
-    uart/bench/bench_uart.cpp       # place bench_uart.cpp here
+    uart/bench/bench_uart.cpp
     uart/src/dma_uart.cpp
 )
 target_include_directories(uart_bench PRIVATE
@@ -64,17 +70,22 @@ add_custom_target(bench
     COMMENT "Running UART throughput benchmark"
 )
 
-# ─── I2C ──────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# I2C
+# ═══════════════════════════════════════════════════════════════════════════════
 add_hce_test(i2c_test
     i2c/test/test_concepts.cpp
     "${CMAKE_SOURCE_DIR}/i2c/include"
+)
+target_include_directories(i2c_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/i2c/include
 )
 target_sources(i2c_test PRIVATE
     i2c/test/test_sensor_factory.cpp
     i2c/test/test_bme280.cpp
     i2c/test/test_shtc3.cpp
     i2c/test/test_lps22hb.cpp
-    i2c/test/test_fs3000.cpp
+    i2c/test/test_pav3015.cpp
     i2c/test/test_error_injection.cpp
     i2c/test/test_csv_output.cpp
     i2c/src/sensor_factory.cpp
@@ -85,7 +96,9 @@ target_sources(i2c_test PRIVATE
     zephyr_app/src/i2c_app.cpp
 )
 
-# ─── SPI ──────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# SPI
+# ═══════════════════════════════════════════════════════════════════════════════
 add_hce_test(spi_test
     spi/test/spi_test.cpp
     "${CMAKE_SOURCE_DIR}/spi/include"
@@ -96,7 +109,9 @@ target_sources(spi_test PRIVATE
     spi/src/adc_driver.cpp
 )
 
-# ─── CRC ──────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# CRC
+# ═══════════════════════════════════════════════════════════════════════════════
 add_hce_test(crc_test
     crc/test/crc_test.cpp
     "${CMAKE_SOURCE_DIR}/crc/include"
@@ -107,13 +122,15 @@ target_sources(crc_test PRIVATE
     crc/src/frame_codec.cpp
 )
 
-# ─── Coverage target ──────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# Coverage targets
+# ═══════════════════════════════════════════════════════════════════════════════
 find_program(LCOV     lcov)
 find_program(GENHTML  genhtml)
 
 if(LCOV AND GENHTML AND ENABLE_COVERAGE)
 
-    # Existing target (leave unchanged)
+    # ── Full coverage (all modules) ──────────────────────────────────────────
     add_custom_target(coverage
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
         COMMAND ${LCOV} --capture --directory .
@@ -137,42 +154,59 @@ if(LCOV AND GENHTML AND ENABLE_COVERAGE)
         COMMENT "Generating lcov HTML coverage report (line + branch)"
     )
 
-    # GPIO-only coverage target
-    add_custom_target(gpio_coverage
-        COMMAND ${CMAKE_BINARY_DIR}/gpio_test
+    # ── Helper macro: per-module coverage ────────────────────────────────────
+    macro(add_module_coverage MODULE_NAME TEST_TARGET EXCLUDE_MODULES)
+        add_custom_target(${MODULE_NAME}_coverage
+            COMMAND ${CMAKE_BINARY_DIR}/${TEST_TARGET}
 
-        COMMAND ${LCOV}
-            --capture
-            --directory .
-            --output-file gpio_raw.info
-            --rc branch_coverage=1
+            COMMAND ${LCOV}
+                --capture
+                --directory .
+                --output-file ${MODULE_NAME}_raw.info
+                --ignore-errors mismatch
+                --rc branch_coverage=1
 
-        COMMAND ${LCOV}
-            --remove gpio_raw.info
-            "/usr/*"
-            "*/gtest/*"
-            "*/zephyr_stubs/*"
-            "*/uart/*"
-            "*/i2c/*"
-            "*/spi/*"
-            "*/crc/*"
-            --output-file gpio.info
-            --rc branch_coverage=1
+            COMMAND ${LCOV}
+                --remove ${MODULE_NAME}_raw.info
+                "/usr/*"
+                "*/gtest/*"
+                "*/zephyr_stubs/*"
+                ${EXCLUDE_MODULES}
+                --output-file ${MODULE_NAME}.info
+                --ignore-errors unused
+                --rc branch_coverage=1
 
-        COMMAND ${GENHTML}
-            gpio.info
-            --output-directory gpio_coverage
-            --branch-coverage
-            --rc branch_coverage=1
+            COMMAND ${GENHTML}
+                ${MODULE_NAME}.info
+                --output-directory ${MODULE_NAME}_coverage
+                --branch-coverage
+                --rc branch_coverage=1
 
-        COMMAND ${CMAKE_COMMAND} -E echo
-            "=== GPIO Coverage Report ==="
-        COMMAND ${CMAKE_COMMAND} -E echo
-            "${CMAKE_BINARY_DIR}/gpio_coverage/index.html"
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "=== ${MODULE_NAME} Coverage Report ==="
+            COMMAND ${CMAKE_COMMAND} -E echo
+                "${CMAKE_BINARY_DIR}/${MODULE_NAME}_coverage/index.html"
 
-        DEPENDS gpio_test
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Generating GPIO-only coverage report"
-    )
+            DEPENDS ${TEST_TARGET}
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Generating ${MODULE_NAME}-only coverage report"
+        )
+    endmacro()
+
+    # ── Per-module coverage targets ──────────────────────────────────────────
+    add_module_coverage(gpio gpio_test
+        "*/uart/*;*/i2c/*;*/spi/*;*/crc/*;*/zephyr_app/*")
+
+    add_module_coverage(uart uart_test
+        "*/gpio/*;*/i2c/*;*/spi/*;*/crc/*;*/zephyr_app/*")
+
+    add_module_coverage(i2c i2c_test
+        "*/gpio/*;*/uart/*;*/spi/*;*/crc/*")
+
+    add_module_coverage(spi spi_test
+        "*/gpio/*;*/uart/*;*/i2c/*;*/crc/*;*/zephyr_app/*")
+
+    add_module_coverage(crc crc_test
+        "*/gpio/*;*/uart/*;*/i2c/*;*/spi/*;*/zephyr_app/*")
 
 endif()

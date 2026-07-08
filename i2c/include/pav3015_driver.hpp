@@ -38,12 +38,26 @@ static constexpr std::array<PavKnot, 9> PAV3015_KNOTS_7MPS = {{
     {3686, 7.23f},
 }};
 
+// ---------------------------------------------------------------------------
+// PAV3015 register / constant definitions
+// ---------------------------------------------------------------------------
+namespace pav3015_reg {
+    static constexpr uint8_t DATA_H    = 0x00;
+    static constexpr uint8_t DATA_L    = 0x01;
+    static constexpr uint8_t STATUS    = 0x02;
+    static constexpr uint8_t CTRL      = 0x03;
+    static constexpr uint8_t RANGE_7MPS  = 0x08;
+    static constexpr uint8_t RANGE_15MPS = 0x0C;
+    static constexpr uint16_t RAW_MIN  = 409;
+    static constexpr uint16_t RAW_MAX  = 3686;
+}
+
 class PAV3015Driver final : public ISensor
 {
 public:
     static constexpr uint8_t DEFAULT_ADDR = 0x28;
-static constexpr uint8_t RANGE_7MPS  = 0x08;
-static constexpr uint8_t RANGE_15MPS = 0x0C;
+    static constexpr uint8_t RANGE_7MPS   = pav3015_reg::RANGE_7MPS;
+    static constexpr uint8_t RANGE_15MPS  = pav3015_reg::RANGE_15MPS;
 
     explicit PAV3015Driver(uint8_t addr = DEFAULT_ADDR,
                            uint8_t range = RANGE_15MPS);

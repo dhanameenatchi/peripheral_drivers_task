@@ -175,3 +175,121 @@ TEST(AdcDriver, NoFilterEmptyHistoryReturnsZero) {
     AdcDriver adc(nullptr);
     EXPECT_EQ(adc.filteredValue(), 0);
 }
+
+// ---------------------------------------------------------------------------
+// Runtime strategy switching — simulates UART "filter" command behavior
+// ---------------------------------------------------------------------------
+TEST(AdcDriver, RuntimeSwitchMavgToMedian) {
+    MovingAverageFilter mavg(4);
+    MedianFilter        med(5);
+    AdcDriver           adc(&mavg);
+
+    // Build history: 1,2,3,4,5,6,7,8
+    for (int16_t i = 1; i <= 8; ++i) {
+        spi_sim::rx_inject = { 0, static_cast<uint8_t>(i), 0, 0 };
+        adc.readChannel(AdcDriver::Channel::SE_AIN0);
+    }
+
+    // Active strategy is MovingAverage
+    int16_t val_mavg = adc.filteredValue();
+    // last 4: 5,6,7,8 → avg = 6
+    EXPECT_EQ(val_mavg, 6);
+
+    // Runtime switch to Median (simulates "filter median" command)
+    adc.setFilter(&med);
+    int16_t val_med = adc.filteredValue();
+    // last 5: 4,5,6,7,8 → median = 6
+    EXPECT_EQ(val_med, 6);
+
+    // History unchanged
+    EXPECT_EQ(adc.history().size(), 8u);
+}
+
+TEST(AdcDriver, RuntimeSwitchMedianToMavg) {
+    MovingAverageFilter mavg(4);
+    MedianFilter        med(5);
+    AdcDriver           adc(&med);  // starts with Median
+
+    // Build history: 10,20,30
+    for (int16_t v : {10, 20, 30}) {
+        spi_sim::rx_inject = { static_cast<uint8_t>(v >> 8),
+                               static_cast<uint8_t>(v & 0xFF), 0, 0 };
+        adc.readChannel(AdcDriver::Channel::SE_AIN0);
+    }
+
+    // Median of {10,20,30} → window=5 but only 3 samples → median of sorted {10,20,30} = 20
+    EXPECT_EQ(adc.filteredValue(), 20);
+
+    // Switch to MovingAverage
+    adc.setFilter(&mavg);
+    // MA window=4, only 3 samples → avg(10,20,30) = 20
+    EXPECT_EQ(adc.filteredValue(), 20);
+}
+
+TEST(AdcDriver, RepeatedSwitching) {
+    MovingAverageFilter mavg(4);
+    MedianFilter        med(5);
+    AdcDriver           adc(&mavg);
+
+    spi_sim::rx_inject = { 0x00, 0x64, 0x00, 0x00 };  // 100
+    adc.readChannel(AdcDriver::Channel::SE_AIN0);
+
+    // Switch back and forth rapidly
+    for (int i = 0; i < 10; ++i) {
+        adc.setFilter(&med);
+        int16_t v1 = adc.filteredValue();
+        adc.setFilter(&mavg);
+        int16_t v2 = adc.filteredValue();
+        // Both should return 100 (single sample)
+        EXPECT_EQ(v1, 100);
+        EXPECT_EQ(v2, 100);
+    }
+
+    // History should still have exactly 1 sample
+    EXPECT_EQ(adc.history().size(), 1u);
+}
+
+TEST(AdcDriver, InvalidCommandFilterUnchanged) {
+    MovingAverageFilter mavg(4);
+    MedianFilter        med(5);
+    AdcDriver           adc(&mavg);
+
+    spi_sim::rx_inject = { 0x00, 0x0A, 0x00, 0x00 };  // 10
+    adc.readChannel(AdcDriver::Channel::SE_AIN0);
+
+    int16_t before = adc.filteredValue();
+
+    // Simulate: user typed an invalid command — filter is NOT changed
+    // (no setFilter call happens for invalid input)
+    // Verify the active filter still produces the same result
+    int16_t after = adc.filteredValue();
+    EXPECT_EQ(before, after);
+    EXPECT_EQ(after, 10);
+}
+
+TEST(AdcDriver, StrategyPersistsUntilNextCommand) {
+    MovingAverageFilter mavg(4);
+    MedianFilter        med(5);
+    AdcDriver           adc(&mavg);
+
+    // Switch to Median once
+    adc.setFilter(&med);
+
+    // Read multiple samples — strategy should stay as Median
+    for (int16_t i = 1; i <= 10; ++i) {
+        spi_sim::rx_inject = { 0, static_cast<uint8_t>(i), 0, 0 };
+        adc.readChannel(AdcDriver::Channel::SE_AIN0);
+    }
+
+    // Verify Median is still active: last 5 = {6,7,8,9,10} → sorted → median = 8
+    EXPECT_EQ(adc.filteredValue(), 8);
+
+    // Read more samples without switching — Median must persist
+    for (int16_t i = 11; i <= 15; ++i) {
+        spi_sim::rx_inject = { 0, static_cast<uint8_t>(i), 0, 0 };
+        adc.readChannel(AdcDriver::Channel::SE_AIN0);
+    }
+
+    // last 5: {11,12,13,14,15} → median = 13
+    EXPECT_EQ(adc.filteredValue(), 13);
+}

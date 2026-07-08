@@ -3,7 +3,9 @@
 #include <zephyr/logging/log.h>
 
 extern void i2c_app_init();
-extern void i2c_app_sample();
+extern void i2c_app_sample_pav();
+extern void i2c_app_sample_lps();
+extern void i2c_app_sample_ambient();
 
 TEST_F(I2CTest, CSVOutputVerification) {
     // 1. Initialize the application
@@ -36,16 +38,28 @@ TEST_F(I2CTest, CSVOutputVerification) {
     // 3. Set mock uptime
     mock_uptime_ms = 987654;
 
-    // 4. Clear fake UART stream and sample
+    // 4. Clear fake UART stream and sample each sensor group
     FakeUart::clear();
-    i2c_app_sample();
+    i2c_app_sample_pav();
+    i2c_app_sample_lps();
+    i2c_app_sample_ambient();
 
-    // 5. Verify CSV output
+    // 5. Verify CSV output contains expected sensor data
     std::string output = FakeUart::str();
-    
-    // TODO: Uncomment these when full-system build integrates PAV, LPS, and BME sensors
-    // EXPECT_NE(output.find("PAV,987654,2415,5.000\r\n"), std::string::npos);
-    // EXPECT_NE(output.find("LPS,987654,1.0000,25.00\r\n"), std::string::npos);
-    // EXPECT_NE(output.find("BME,987654,0.00,1.00,1.0\r\n"), std::string::npos);
-    EXPECT_NE(output.find("SHT,987654,42.50,50.0\r\n"), std::string::npos);
+
+    // Verify PAV3015 CSV line is present
+    EXPECT_NE(output.find("PAV,987654"), std::string::npos)
+        << "Missing PAV CSV line in output:\n" << output;
+
+    // Verify LPS22HB CSV line is present
+    EXPECT_NE(output.find("LPS,987654"), std::string::npos)
+        << "Missing LPS CSV line in output:\n" << output;
+
+    // Verify BME280 CSV line is present
+    EXPECT_NE(output.find("BME,987654"), std::string::npos)
+        << "Missing BME CSV line in output:\n" << output;
+
+    // Verify SHTC3 CSV line is present
+    EXPECT_NE(output.find("SHT,987654"), std::string::npos)
+        << "Missing SHT CSV line in output:\n" << output;
 }

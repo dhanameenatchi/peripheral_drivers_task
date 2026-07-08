@@ -11,7 +11,7 @@
 **RTOS:** Zephyr RTOS (v4.x) with C++20 support
 
 **Communication Interfaces:**
-- **GPIO** — Digital I/O with interrupt-driven debounce (PC13 button, PA5/PA6 LEDs)
+- **GPIO** — Digital I/O with interrupt-driven debounce (PC13 button, PB0/PB1 LEDs)
 - **UART** — USART2 via ST-Link VCP at 921600 baud with DMA TX/RX (PA2/PA3)
 - **I2C** — I2C1 bus at 400 kHz (PB8 SCL, PB9 SDA) — shared by 4 sensors
 - **SPI** — SPI1 at 4 MHz (PA5/PA6/PA7/PB6) — ADS1118 16-bit ADC
@@ -70,7 +70,7 @@
 | FS3000-1005 flow sensor | Requirement.md specifies FS3000; PAV3015 was implemented instead |
 | Silicone tubing | For CPAP airway simulation; not required for electrical testing |
 | Second push button | Requirement.md mentions "×2 tactile buttons"; only on-board B1 (PC13) is used |
-| Second LED module | Requirement.md mentions "×2 LED modules"; green LD2 (PA5) + external yellow (PA6) are implemented |
+| Second LED module | Requirement.md mentions "×2 LED modules"; green (PB0) + external yellow (PB1) are implemented |
 
 ---
 
@@ -83,8 +83,8 @@ All pin assignments are extracted from `zephyr_app/boards/nucleo_f446re.overlay`
 | Signal | MCU Pin | Arduino Header | Direction | Notes |
 |--------|---------|---------------|-----------|-------|
 | USER_BUTTON (B1) | PC13 | — (on-board) | Input | Active LOW, internal pull-up, ISR on both edges |
-| GREEN_LED (LD2) | PA5 | D13 (CN5) | Output | On-board; **conflicts with SPI1_SCK** |
-| YELLOW_LED | PA6 | D12 (CN5) | Output | External, 220 Ω to GND |
+| GREEN_LED | PB0 | D3 (CN9) | Output | External green LED (moved to PB0 to resolve SPI1 conflict) |
+| YELLOW_LED | PB1 | D4 (CN9) | Output | External yellow LED (moved to PB1 to resolve SPI1 conflict) |
 
 Source: `nucleo_f446re.overlay` lines 10–22, `digital_io.hpp` `pins::` namespace.
 
@@ -120,9 +120,9 @@ Source: `nucleo_f446re.overlay` line 56: `pinctrl-0 = <&i2c1_scl_pb8 &i2c1_sda_p
 
 | Signal | MCU Pin | Arduino Header | Peripheral | Notes |
 |--------|---------|---------------|------------|-------|
-| SPI1_SCK | PA5 | D13 (CN5) | SPI1 | **Shared with LD2 green LED** |
-| SPI1_MISO | PA6 | D12 (CN5) | SPI1 | Also YELLOW_LED |
-| SPI1_MOSI | PA7 | D11 (CN5) | SPI1 | |
+| SPI1_SCK | PA5 | D13 (CN5) | SPI1 | Dedicated to ADS1118 SCLK (LED conflict resolved) |
+| SPI1_MISO | PA6 | D12 (CN5) | SPI1 | Dedicated to ADS1118 MISO (LED conflict resolved) |
+| SPI1_MOSI | PA7 | D11 (CN5) | SPI1 | Dedicated to ADS1118 MOSI |
 | SPI1_CS | PB6 | D10 (CN5) | GPIO output | Active LOW for ADS1118 |
 
 SPI frequency: 4 MHz, Mode 1 (CPOL=0, CPHA=1)
@@ -236,9 +236,8 @@ Orientation: sensing element opening must face **into** the airflow direction.
 | AIN0 | Potentiometer wiper | Test input |
 | AGND | GND | |
 
-**⚠️ PA5 Conflict:** PA5 is both SPI1_SCK and LD2 green LED. Options:
-- **Option A:** Remove solder bridge SB21 on NUCLEO to free PA5 for SPI
-- **Option B:** Use SPI2 (PB13/PB14/PB15) and update the overlay
+**ℹ️ SPI1/LED Conflict Resolution:**
+The green and yellow LEDs have been re-mapped in `nucleo_f446re.overlay` to PB0 and PB1. This completely avoids pin sharing conflicts with the SPI1 interface (SCK on PA5 and MISO on PA6). No hardware modification or solder bridge removal is required.
 
 ### Voltage Divider for ADS1118 Testing
 
@@ -257,9 +256,9 @@ PC13 (B1) — On-board blue button, no external wiring needed. Active LOW with i
 ### LEDs
 
 ```
-PA5 (D13) ── LD2 green LED (on-board, no wiring)
+PB0 (D3) ──[220 Ω]──[Green LED anode (+)]──[cathode (−)]── GND (CN6 pin 6)
 
-PA6 (D12) ──[220 Ω]──[Yellow LED anode (+)]──[cathode (−)]── GND (CN6 pin 6)
+PB1 (D4) ──[220 Ω]──[Yellow LED anode (+)]──[cathode (−)]── GND (CN6 pin 6)
 ```
 
 ### UART (On-Board)
@@ -465,7 +464,7 @@ sudo apt install openocd stlink-tools   # Linux
 
 - Check CS (PB6) is wired to ADS1118 CS pin
 - Verify SPI Mode 1 (CPOL=0, CPHA=1) — ADS1118 requirement
-- Check SB21 solder bridge is disconnected if using PA5 for SPI1_SCK
+- Verify that LEDs are mapped to PB0/PB1 to avoid sharing conflicts with SPI1_SCK (PA5) and SPI1_MISO (PA6)
 - Verify AIN0 has a valid analog input (not floating)
 
 ### Serial Monitor Shows Garbage

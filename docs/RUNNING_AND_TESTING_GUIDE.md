@@ -179,8 +179,11 @@ Memory region   Used Size  Region Size  %age Used
 # Host
 rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Debug && make -C build -j$(nproc)
 
-# Zephyr
-cd zephyr_app && rm -rf build && west build -b nucleo_f446re -- -DCONF_FILE=config/prj.conf -DDTC_OVERLAY_FILE=boards/nucleo_f446re.overlay
+# Zephyr (Build all modules together)
+cd zephyr_app && rm -rf build && west build -b nucleo_f446re -- -DCONF_FILE=config/prj.conf -DDTC_OVERLAY_FILE=boards/nucleo_f446re.overlay -DDEMO_MODE=ALL
+
+# Zephyr (Compile only one selected module, e.g., GPIO_ONLY, UART_ONLY, I2C_ONLY, SPI_ONLY, CRC_ONLY)
+west build -b nucleo_f446re -- -DDEMO_MODE=GPIO_ONLY
 ```
 
 ---
@@ -190,7 +193,15 @@ cd zephyr_app && rm -rf build && west build -b nucleo_f446re -- -DCONF_FILE=conf
 ### Standard Flash
 
 ```bash
-cd ~/zephyrproject/hce_drivers/zephyr_app
+cd ~/zephyrproject/zephyr_hce_task/hce_drivers/zephyr_app
+
+#spi only build
+west build -b nucleo_f446re -d build --pristine -- -DMODULE=SPI -DCONF_FILE="config/prj.conf;config/prj_spi.conf"
+west flash -d build
+minicom -D /dev/ttyACM0 -b 921600
+filter mavg
+filter median
+
 west flash
 ```
 
