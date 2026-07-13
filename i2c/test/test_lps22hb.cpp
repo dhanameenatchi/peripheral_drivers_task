@@ -95,3 +95,12 @@ TEST_F(I2CTest, LPS22HB_ReadTemp_SuccessReturnsValue) {
     float t = lps.readTemp_C();
     EXPECT_NEAR(t, 25.0f, 0.1f);
 }
+
+TEST_F(I2CTest, LPS22HB_ReadPressure_NegativeSignExtension) {
+    setupLps22hb();
+    setReg24_LE(0x5C, 0x28, 0xFFFFFFu);
+    LPS22HbDriver lps;
+    int32_t raw = lps.readRaw();
+    EXPECT_EQ(raw, -1);
+}
+

@@ -58,22 +58,3 @@ public:
     fake_uart::stream << "[DBG] " << log_buf << '\n'; \
 } while(0)
 
-#define LOG_ERR(fmt, ...) do { \
-    char log_buf[256]; \
-    std::snprintf(log_buf, sizeof(log_buf), fmt, ##__VA_ARGS__); \
-    fake_uart::stream << log_buf; \
-} while(0)
-
-#define LOG_WRN(fmt, ...) do { \
-    char log_buf[256]; \
-    std::snprintf(log_buf, sizeof(log_buf), fmt, ##__VA_ARGS__); \
-    fake_uart::stream << log_buf; \
-} while(0)
-
-#define LOG_DBG(fmt, ...) do { \
-    char log_buf[256]; \
-    std::snprintf(log_buf, sizeof(log_buf), fmt, ##__VA_ARGS__); \
-    fake_uart::stream << log_buf; \
-} while(0)
-
-#define LOG_WRN_ONCE(fmt, ...) LOG_WRN(fmt, ##__VA_ARGS__)

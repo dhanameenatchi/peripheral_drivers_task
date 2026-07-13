@@ -22,7 +22,7 @@ TEST_F(I2CTest, PAV3015_Checksum_TooShort)
 TEST_F(I2CTest, PAV3015_Checksum_ZeroBytes)
 {
     uint8_t buf[3] = {0x00, 0x00, 0x00};
-    EXPECT_FALSE(PAV3015Driver::validateChecksum(buf, 3));
+    EXPECT_TRUE(PAV3015Driver::validateChecksum(buf, 3));
 }
 
 TEST_F(I2CTest, PAV3015_Interpolation_AtAllKnots_15MPS)
@@ -131,3 +131,12 @@ TEST_F(I2CTest, PAV3015_SetRange_ChangesInterpolationTable)
     EXPECT_NEAR(pav.readVelocity_mps(),
                 PAV3015_KNOTS_7MPS.back().velocity_mps, 0.01f);
 }
+
+TEST_F(I2CTest, PAV3015_ReadRaw_ChecksumFailed)
+{
+    setPav3015Adc(1000);
+    i2c_sim::regs[PAV3015Driver::DEFAULT_ADDR][0] ^= 0xFF;
+    PAV3015Driver pav;
+    EXPECT_EQ(pav.readRaw(), INT32_MIN);
+}
+

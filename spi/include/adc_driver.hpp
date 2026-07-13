@@ -88,8 +88,8 @@ public:
     void setFilter(IFilter* f);
 
     // Read raw ADC value from selected channel
-    // int16_t readChannel(Channel ch, PGA pga = PGA::FSR_2V);
-int16_t readChannel(Channel ch, PGA pga, Mode mode);
+    // int16_t readChannel(Channel ch, PGA pga, Mode mode);
+    int16_t readChannel(Channel ch, PGA pga = PGA::FSR_2_048V, Mode mode = Mode::SINGLE_SHOT);
     // Apply current strategy filter to history
     int16_t filteredValue();
 

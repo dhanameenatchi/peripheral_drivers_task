@@ -1,0 +1,20 @@
+# Copyright (c) 2026 Google DeepMind
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "HCE Peripheral Drivers Firmware Application"
+
+config CRC_STRATEGY_CRC8
+	bool "Use CRC8-Maxim strategy for CRC module"
+	default n
+	help
+	  Enable this to use CRC8-Maxim for the CRC loopback service and demo.
+	  If disabled (default), CRC16-CCITT will be used.
+
+config CRC_LOOPBACK_MODE
+	bool "Enable CRC Loopback Mode"
+	default n
+	help
+	  Enable this to run the CRC module in Loopback Mode (for scripts/loopback_test.py).
+	  This disables the periodic demo logging to prevent serial stream corruption.
+
+source "Kconfig.zephyr"

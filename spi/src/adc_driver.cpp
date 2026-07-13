@@ -72,11 +72,15 @@ int16_t AdcDriver::readChannel(Channel ch, PGA pga, Mode mode) {
     struct spi_buf_set tx_set = { .buffers = &tx_buf, .count = 1 };
     struct spi_buf_set rx_set = { .buffers = &rx_buf, .count = 1 };
 
+#ifdef ZEPHYR_BUILD
     gpio_pin_set_dt(&cs_gpio_, 1); // Assert CS (Low)
 
     int err = spi_transceive(spi_dev_, &spi_cfg_, &tx_set, &rx_set);
 
     gpio_pin_set_dt(&cs_gpio_, 0); // Deassert CS (High)
+#else
+    int err = spi_transceive(nullptr, &spi_cfg_, &tx_set, &rx_set);
+#endif
 
     if (err != 0) {
         last_error_ = err;

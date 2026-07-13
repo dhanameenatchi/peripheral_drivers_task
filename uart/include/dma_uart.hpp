@@ -16,7 +16,7 @@ enum class LogLevel : uint8_t { DEBUG = 0, INFO, WARN, ERROR };
 struct LogPacket {
     uint32_t timestamp_ms;
     LogLevel level;
-    char     message[32];
+    char     message[64];
 
     static LogPacket make(uint32_t ts, LogLevel lvl, const char* msg);
 };

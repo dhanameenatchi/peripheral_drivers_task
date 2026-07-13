@@ -205,7 +205,7 @@ TEST_F(RingBufferTest, SizeTracksCorrectly) {
 struct TestPkt {
     uint32_t ts;
     uint8_t  lvl;
-    char     msg[32];
+    char     msg[64];
 };
 
 TEST(RingBufferTypes, NonTrivialStruct) {
@@ -572,10 +572,11 @@ TEST_F(DmaUartTest, RxOverflowCounter) {
 // 18. LogPacket::make() — message truncated to 31 chars + null terminator
 // ---------------------------------------------------------------------------
 TEST(LogPacketTest, MakeTruncatesLongMessage) {
-    const char* long_msg = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345678";  // 35 chars
+    // 70 characters long message
+    const char* long_msg = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     auto p = LogPacket::make(0, LogLevel::WARN, long_msg);
-    EXPECT_EQ(p.message[31], '\0');  // always null-terminated
-    EXPECT_EQ(std::strlen(p.message), 31u);
+    EXPECT_EQ(p.message[63], '\0');  // always null-terminated
+    EXPECT_EQ(std::strlen(p.message), 63u);
 }
 
 // ---------------------------------------------------------------------------
@@ -716,4 +717,46 @@ TEST(UartMockTest, StubsAndSimulationHelpers) {
     uart_sim::reset();
     EXPECT_EQ(uart_sim::get_tx_size(), 0u);
     EXPECT_EQ(uart_sim::get_tx_call_count(), 0u);
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage tests
+// ---------------------------------------------------------------------------
+TEST(RingBufferConcurrent, PushContentionRetry) {
+    RingBuffer<uint32_t, 8> rb;
+    for (uint32_t i = 0; i < 7; ++i) {
+        rb.push(i);
+    }
+    ASSERT_TRUE(rb.full());
+
+    constexpr int NUM_THREADS = 4;
+    constexpr int NUM_PUSHES = 1000;
+    std::vector<std::thread> threads;
+    for (int t = 0; t < NUM_THREADS; ++t) {
+        threads.emplace_back([&rb]() {
+            for (int i = 0; i < NUM_PUSHES; ++i) {
+                rb.push(999);
+            }
+        });
+    }
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    EXPECT_EQ(rb.overflowCount(), static_cast<uint32_t>(NUM_THREADS * NUM_PUSHES));
+}
+
+TEST_F(DmaUartTest, DrainToTxBufferExactSize) {
+    uart.log(0, LogLevel::INFO, "hello");
+    size_t n = uart.drainToTxBuffer(outbuf, 17);
+    EXPECT_EQ(n, 17u);
+    EXPECT_EQ(uart.txPending(), 0u);
+}
+
+TEST_F(DmaUartTest, InvalidLogLevel) {
+    uart.log(100, static_cast<LogLevel>(5), "Invalid");
+    size_t n = uart.drainToTxBuffer(outbuf, sizeof(outbuf));
+    EXPECT_GT(n, 0u);
+    EXPECT_NE(std::strstr(reinterpret_cast<char*>(outbuf), "[UNK]"), nullptr);
 }

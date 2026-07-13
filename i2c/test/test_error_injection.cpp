@@ -102,3 +102,122 @@ TEST_F(I2CTest, LPS22HB_ToSI_NackReturnsNaN) {
     lps.readRaw();
     EXPECT_TRUE(std::isnan(lps.toSI()));
 }
+
+// ---------------------------------------------------------------------------
+// Additional error injection tests
+// ---------------------------------------------------------------------------
+TEST_F(I2CTest, ConstructorNack_BME280_ChipIDReadFails) {
+    i2c_sim::nack_next = true;
+    BME280Driver bme;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 1u);
+}
+
+TEST_F(I2CTest, ConstructorNack_BME280_UnexpectedChipID) {
+    i2c_sim::regs[BME280Driver::DEFAULT_ADDR][BME280Driver::REG_CHIP_ID] = 0x00;
+    BME280Driver bme;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 1u);
+}
+
+TEST_F(I2CTest, ConstructorNack_BME280_CalibReadFails) {
+    i2c_sim::nack_after_n = 1;
+    BME280Driver bme;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 2u);
+}
+
+TEST_F(I2CTest, ConstructorNack_BME280_CtrlHumFails) {
+    i2c_sim::nack_after_n = 2;
+    BME280Driver bme;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 3u);
+}
+
+TEST_F(I2CTest, ConstructorNack_BME280_CtrlMeasFails) {
+    i2c_sim::nack_after_n = 3;
+    BME280Driver bme;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 4u);
+}
+
+TEST_F(I2CTest, ConstructorNack_SHTC3_WakeFails) {
+    i2c_sim::nack_next = true;
+    SHTC3Driver shtc;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 1u);
+}
+
+TEST_F(I2CTest, ConstructorNack_SHTC3_ResetFails) {
+    i2c_sim::nack_after_n = 1;
+    SHTC3Driver shtc;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 2u);
+}
+
+TEST_F(I2CTest, ConstructorNack_LPS22HB_WhoAmIFails) {
+    i2c_sim::nack_next = true;
+    LPS22HbDriver lps;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 1u);
+}
+
+TEST_F(I2CTest, ConstructorNack_LPS22HB_Ctrl1Fails) {
+    i2c_sim::nack_after_n = 1;
+    LPS22HbDriver lps;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 2u);
+}
+
+TEST_F(I2CTest, ConstructorNack_PAV3015_RangeReadFails) {
+    i2c_sim::nack_next = true;
+    PAV3015Driver pav;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 1u);
+}
+
+
+TEST_F(I2CTest, SHTC3_ReadRaw_WakeFails) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_next = true;
+    EXPECT_EQ(shtc.readRaw(), INT32_MIN);
+}
+
+TEST_F(I2CTest, SHTC3_ReadRaw_MeasurementFails) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_after_n = 1;
+    EXPECT_EQ(shtc.readRaw(), INT32_MIN);
+}
+
+TEST_F(I2CTest, SHTC3_ReadHumidity_WakeFails) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_next = true;
+    EXPECT_TRUE(std::isnan(shtc.readHumidity_pct()));
+}
+
+TEST_F(I2CTest, SHTC3_ReadHumidity_MeasurementFails) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_after_n = 1;
+    EXPECT_TRUE(std::isnan(shtc.readHumidity_pct()));
+}
+
+TEST_F(I2CTest, ConstructorNack_LPS22HB_UnexpectedChipID) {
+    i2c_sim::regs[0x5C][0x0F] = 0x00;
+    LPS22HbDriver lps;
+    EXPECT_EQ(i2c_sim::transaction_history.size(), 1u);
+}
+
+TEST_F(I2CTest, PAV3015_SetRange_InvalidRangeReturnsFalse) {
+    PAV3015Driver pav;
+    EXPECT_FALSE(pav.setRange(99));
+}
+
+TEST_F(I2CTest, SHTC3_ReadRaw_ReadBytesFails) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_after_n = 2;
+    EXPECT_EQ(shtc.readRaw(), INT32_MIN);
+}
+
+TEST_F(I2CTest, SHTC3_ReadHumidity_ReadBytesFails) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_after_n = 2;
+    EXPECT_TRUE(std::isnan(shtc.readHumidity_pct()));
+}
+
+TEST_F(I2CTest, SHTC3_ReadTemperature_NackReturnsNaN) {
+    SHTC3Driver shtc;
+    i2c_sim::nack_next = true;
+    EXPECT_TRUE(std::isnan(shtc.readTemperature_C()));
+}
+
+

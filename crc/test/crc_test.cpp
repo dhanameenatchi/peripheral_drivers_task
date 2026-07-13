@@ -265,3 +265,18 @@ TEST(FrameCodec8, ZeroPayloadRoundTrip) {
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->payload_len, 0u);
 }
+
+// ---------------------------------------------------------------------------
+// Additional coverage tests
+// ---------------------------------------------------------------------------
+TEST(CrcStrategy, VirtualDestructor) {
+    ICrcStrategy* strategy = new Crc16Ccitt();
+    delete strategy;
+}
+
+TEST(FrameCodec16, DecodeNullBuffer) {
+    Crc16Ccitt crc;
+    FrameCodec codec(crc);
+    EXPECT_FALSE(codec.decode(nullptr, 10).has_value());
+}
+

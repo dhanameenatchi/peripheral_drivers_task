@@ -5,6 +5,26 @@
 cmake_minimum_required(VERSION 3.20)
 
 # ── Select MODULE and CONF_FILE (must come before find_package(Zephyr)) ───────
+if(DEFINED CONF_FILE)
+    if(CONF_FILE MATCHES "prj_i2c")
+        set(MODULE I2C)
+    elseif(CONF_FILE MATCHES "prj_spi")
+        set(MODULE SPI)
+    elseif(CONF_FILE MATCHES "prj_gpio")
+        set(MODULE GPIO)
+    elseif(CONF_FILE MATCHES "prj_uart")
+        set(MODULE UART)
+    elseif(CONF_FILE MATCHES "prj_crc")
+        set(MODULE CRC)
+    elseif(CONF_FILE MATCHES "prj_all")
+        set(MODULE ALL)
+    endif()
+
+    if(NOT CONF_FILE MATCHES "prj\\.conf")
+        set(CONF_FILE "config/prj.conf;${CONF_FILE}" CACHE STRING "Forced inclusion of base prj.conf" FORCE)
+    endif()
+endif()
+
 if(NOT DEFINED MODULE)
     set(MODULE ALL)
 endif()
@@ -12,7 +32,13 @@ endif()
 message(STATUS "Configuring HCE Firmware with MODULE=${MODULE}")
 
 string(TOLOWER ${MODULE} MODULE_LOWER)
-set(CONF_FILE "config/prj.conf;config/prj_${MODULE_LOWER}.conf")
+if(NOT DEFINED CONF_FILE)
+    set(CONF_FILE "config/prj.conf;config/prj_${MODULE_LOWER}.conf")
+endif()
+
+if(MODULE STREQUAL "CRC")
+    set(DTC_OVERLAY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/boards/nucleo_f446re.overlay;${CMAKE_CURRENT_SOURCE_DIR}/config/crc.overlay" CACHE STRING "CRC overlay configuration" FORCE)
+endif()
 
 # Find Zephyr — must come before project()
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})

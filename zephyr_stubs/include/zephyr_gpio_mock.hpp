@@ -220,6 +220,24 @@ inline int  gpio_pin_toggle_dt(const gpio_dt_spec* spec) {
 inline bool gpio_is_ready_dt(const gpio_dt_spec*)                      { return true; }
 
 // ---------------------------------------------------------------------------
+// k_work stub
+// ---------------------------------------------------------------------------
+struct k_work {
+    void (*handler)(k_work*) = nullptr;
+};
+
+inline void k_work_init(k_work* w, void (*handler)(k_work*)) {
+    w->handler = handler;
+}
+
+inline int k_work_submit(k_work* w) {
+    if (w && w->handler) {
+        w->handler(w);
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // k_timer stub
 // Stores the expiry callback so fireDebounceTimer() can invoke it directly.
 // ---------------------------------------------------------------------------

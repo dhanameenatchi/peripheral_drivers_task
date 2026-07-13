@@ -138,6 +138,13 @@ inline int i2c_write_dt(const void* dev, const uint8_t* buf, size_t len) {
         i2c_sim::nack_next = false;
         return -EIO;
     }
+    if (i2c_sim::nack_after_n >= 0) {
+        if (i2c_sim::nack_after_n == 0) {
+            i2c_sim::nack_after_n = -1;
+            return -EIO;
+        }
+        --i2c_sim::nack_after_n;
+    }
     if (len >= 2) {
         i2c_sim::regs[addr][buf[0]] = buf[1];
     }
