@@ -293,3 +293,37 @@ TEST(AdcDriver, StrategyPersistsUntilNextCommand) {
     // last 5: {11,12,13,14,15} → median = 13
     EXPECT_EQ(adc.filteredValue(), 13);
 }
+
+// ---------------------------------------------------------------------------
+// Additional coverage tests
+// ---------------------------------------------------------------------------
+TEST(IFilter, VirtualDestructor) {
+    IFilter* f = new MovingAverageFilter(4);
+    delete f;
+}
+
+TEST(MedianFilter, WindowLargerThanBuffer) {
+    // Window is forced odd, 39 | 1 = 39. Buffer size is 32.
+    MedianFilter med(39);
+    EXPECT_STREQ(med.name(), "Median");
+
+    // Prepare a vector/span of 40 elements: 1..40
+    std::vector<int16_t> samples;
+    for (int16_t i = 1; i <= 40; ++i) {
+        samples.push_back(i);
+    }
+
+    // This should copy last 32 elements (since window is limited to tmp buffer of 32)
+    // Last 32 elements are: 9..40
+    // Median of 32 sorted elements: index n/2 = 32/2 = 16
+    // Elements: 9..40 -> index 16 is 9 + 16 = 25
+    int16_t result = med.apply(samples);
+    EXPECT_EQ(result, 25);
+}
+
+TEST(AdcDriver, FilterEmptyHistoryReturnsZero) {
+    MovingAverageFilter mavg(4);
+    AdcDriver adc(&mavg);
+    EXPECT_EQ(adc.filteredValue(), 0);
+}
+

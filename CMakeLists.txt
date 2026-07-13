@@ -195,18 +195,18 @@ if(LCOV AND GENHTML AND ENABLE_COVERAGE)
 
     # ── Per-module coverage targets ──────────────────────────────────────────
     add_module_coverage(gpio gpio_test
-        "*/uart/*;*/i2c/*;*/spi/*;*/crc/*;*/zephyr_app/*")
+    "*/uart/*;*/i2c/*;*/spi/*;*/crc/*;*/zephyr_app/*;*/gpio/test/*")
 
-    add_module_coverage(uart uart_test
-        "*/gpio/*;*/i2c/*;*/spi/*;*/crc/*;*/zephyr_app/*")
+add_module_coverage(uart uart_test
+    "*/gpio/*;*/i2c/*;*/spi/*;*/crc/*;*/zephyr_app/*;*/uart/test/*")
 
-    add_module_coverage(i2c i2c_test
-        "*/gpio/*;*/uart/*;*/spi/*;*/crc/*")
+add_module_coverage(i2c i2c_test
+    "*/gpio/*;*/uart/*;*/spi/*;*/crc/*;*/i2c/test/*")
 
-    add_module_coverage(spi spi_test
-        "*/gpio/*;*/uart/*;*/i2c/*;*/crc/*;*/zephyr_app/*")
+add_module_coverage(spi spi_test
+    "*/gpio/*;*/uart/*;*/i2c/*;*/crc/*;*/zephyr_app/*;*/spi/test/*")
 
-    add_module_coverage(crc crc_test
-        "*/gpio/*;*/uart/*;*/i2c/*;*/spi/*;*/zephyr_app/*")
+add_module_coverage(crc crc_test
+    "*/gpio/*;*/uart/*;*/i2c/*;*/spi/*;*/zephyr_app/*;*/crc/test/*")
 
 endif()

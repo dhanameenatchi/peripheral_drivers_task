@@ -118,16 +118,19 @@ class TestResult:
 
 def test_normal_roundtrip(port, use_crc16: bool) -> TestResult:
     """Encode a frame, send, receive, decode — must match."""
+    if hasattr(port, 'reset_input_buffer'):
+        port.reset_input_buffer()
     cmd     = 0x42
     payload = b"ALARM_01"
     frame   = encode_frame(cmd, payload, use_crc16)
-
     port.write(frame)
+    time.sleep(0.25)  # allow firmware to process and echo
     received = port.read(len(frame))
 
     decoded = decode_frame(received, use_crc16)
     if decoded is None:
-        return TestResult("Round-trip", False, "Decode returned None")
+        return TestResult("Round-trip", False,
+                          f"Decode returned None (sent {len(frame)}B, got {len(received)}B: {received.hex()})")
     if decoded["cmd"] != cmd or decoded["payload"] != payload:
         return TestResult("Round-trip", False,
                           f"Mismatch: cmd={decoded['cmd']} payload={decoded['payload']}")
@@ -136,9 +139,12 @@ def test_normal_roundtrip(port, use_crc16: bool) -> TestResult:
 
 def test_single_bit_error(port, use_crc16: bool) -> TestResult:
     """Inject a single-bit error — decode must return None."""
+    if hasattr(port, 'reset_input_buffer'):
+        port.reset_input_buffer()
     frame      = encode_frame(0x10, b"safe_data", use_crc16)
     corrupted  = inject_single_bit_error(frame, byte_index=3, bit=3)
     port.write(corrupted)
+    time.sleep(0.25)
     received   = port.read(len(corrupted))
     decoded    = decode_frame(received, use_crc16)
     if decoded is not None:
@@ -147,9 +153,12 @@ def test_single_bit_error(port, use_crc16: bool) -> TestResult:
 
 def test_frame_drop_simulation(port, use_crc16: bool) -> TestResult:
     """Send a truncated frame — must be rejected."""
+    if hasattr(port, 'reset_input_buffer'):
+        port.reset_input_buffer()
     frame     = encode_frame(0x20, b"hi", use_crc16)
     truncated = frame[:len(frame) - 2]  # remove CRC bytes
     port.write(truncated)
+    time.sleep(0.5)  # wait for firmware timeout to reset state machine
     received  = port.read(len(frame))
     decoded   = decode_frame(received[:len(truncated)], use_crc16)
     if decoded is not None:
@@ -158,23 +167,33 @@ def test_frame_drop_simulation(port, use_crc16: bool) -> TestResult:
 
 def test_max_payload(port, use_crc16: bool) -> TestResult:
     """32-byte payload boundary."""
+    if hasattr(port, 'reset_input_buffer'):
+        port.reset_input_buffer()
     payload = bytes(range(MAX_PAYLOAD))
     frame   = encode_frame(0xFF, payload, use_crc16)
+    time.sleep(0.1)
     port.write(frame)
+    time.sleep(0.25)
     received = port.read(len(frame))
     decoded  = decode_frame(received, use_crc16)
     if decoded is None or decoded["payload"] != payload:
-        return TestResult("Max payload 32B", False, f"decoded={decoded}")
+        return TestResult("Max payload 32B", False,
+                          f"decoded={decoded} (sent {len(frame)}B, got {len(received)}B: {received.hex()})")
     return TestResult("Max payload 32B", True, "32-byte payload round-trip OK")
 
 def test_zero_payload(port, use_crc16: bool) -> TestResult:
     """Zero-length payload."""
+    if hasattr(port, 'reset_input_buffer'):
+        port.reset_input_buffer()
     frame   = encode_frame(0x01, b"", use_crc16)
+    time.sleep(0.1)
     port.write(frame)
+    time.sleep(0.25)
     received = port.read(len(frame))
     decoded  = decode_frame(received, use_crc16)
     if decoded is None or len(decoded["payload"]) != 0:
-        return TestResult("Zero-length payload", False)
+        return TestResult("Zero-length payload", False,
+                          f"sent {len(frame)}B, got {len(received)}B: {received.hex()}")
     return TestResult("Zero-length payload", True, "Empty payload OK")
 
 def test_crc_known_vectors() -> list[TestResult]:
@@ -200,13 +219,21 @@ def test_crc_known_vectors() -> list[TestResult]:
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def run_all_tests(port) -> bool:
+def run_all_tests(port, crc_mode: str = "both") -> bool:
     all_results: list[TestResult] = []
 
     # Known vector tests (no serial needed)
     all_results.extend(test_crc_known_vectors())
 
-    for use_crc16 in (True, False):
+    strategies = []
+    if crc_mode == "16":
+        strategies = [True]
+    elif crc_mode == "8":
+        strategies = [False]
+    else:
+        strategies = [True, False]
+
+    for use_crc16 in strategies:
         label = "CRC16" if use_crc16 else "CRC8"
         print(f"\n{'─'*50}")
         print(f"  Running with {label}")
@@ -239,6 +266,7 @@ if __name__ == "__main__":
     parser.add_argument("--port",  default=None, help="Serial port, e.g. /dev/ttyACM0")
     parser.add_argument("--baud",  default=921600, type=int)
     parser.add_argument("--mock",  action="store_true", help="Use software loopback")
+    parser.add_argument("--crc",   choices=["8", "16", "both"], default="both", help="CRC strategy to test (8, 16, or both)")
     args = parser.parse_args()
 
     if args.mock or args.port is None:
@@ -248,11 +276,28 @@ if __name__ == "__main__":
         try:
             import serial
             port = serial.Serial(args.port, args.baud, timeout=1)
+
+            # Allow full boot + settle
+            time.sleep(3.5)
+
+            # Capture and display any boot diagnostic bytes
+            boot_bytes = port.read(port.in_waiting or 1)
+            if boot_bytes:
+                print(f"Boot diagnostic ({len(boot_bytes)}B):")
+                try:
+                    print(f"  ASCII: {boot_bytes.decode('ascii', errors='replace')}")
+                except Exception:
+                    pass
+                print(f"  HEX:   {boot_bytes.hex()}")
+            else:
+                print("(no boot bytes received)")
+
+            port.reset_input_buffer()  # discard any remaining stale bytes
             print(f"Connected to {args.port} @ {args.baud} baud")
         except ImportError:
             print("pyserial not installed. Falling back to mock.")
             port = MockSerial()
 
-    success = run_all_tests(port)
+    success = run_all_tests(port, args.crc)
     port.close()
     sys.exit(0 if success else 1)

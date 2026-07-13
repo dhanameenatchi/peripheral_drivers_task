@@ -249,3 +249,31 @@ TEST(IButtonListener, VirtualDestructor)
     IButtonListener* listener = new MockListener();
     delete listener;
 }
+
+TEST(ButtonEventBus, SubscribeNullptrReturnsFalse) {
+    gpio_dt_spec btn{ 0, 13, 0 };
+    ButtonEventBus bus(btn);
+    EXPECT_FALSE(bus.subscribe(nullptr));
+}
+
+template <typename Tag, typename Tag::type M>
+struct Rob {
+    friend typename Tag::type get(Tag) { return M; }
+};
+
+struct ButtonEventBus_timer {
+    typedef k_timer ButtonEventBus::*type;
+    friend type get(ButtonEventBus_timer);
+};
+
+template struct Rob<ButtonEventBus_timer, &ButtonEventBus::debounce_timer_>;
+
+TEST(ButtonEventBus, TimerExpiryNullSelf) {
+    gpio_dt_spec btn{ 0, 13, 0 };
+    ButtonEventBus bus(btn);
+    k_timer& timer = bus.*get(ButtonEventBus_timer());
+    timer.user_data = nullptr;
+    k_timer_fire(&timer);
+}
+
+

@@ -29,32 +29,60 @@ make -C build -j$(nproc)
 
 cd ~/zephyrproject/zephyr_hce_task/hce_drivers
 
-cmake --build build --target gpio_test
-./build/gpio_test
-cmake --build build --target gpio_coverage
+rm -rf host_build
+cmake -B host_build -DCMAKE_BUILD_TYPE=Debug
 
-cmake --build build --target uart_test
-./build/uart_test
-cmake --build build --target uart_bench
-./build/uart_bench
+cmake --build host_build --target gpio_test
+./host_build/gpio_test
+cmake --build host_build --target gpio_coverage
+xdg-open host_build/gpio_coverage/index.html
 
-cmake --build build --target i2c_test
-./build/i2c_test
+cmake --build host_build --target uart_test
+./host_build/uart_test
+cmake --build host_build --target uart_bench
+./host_build/uart_bench
 
-cmake --build build --target spi_test
-./build/spi_test
+cmake --build host_build --target i2c_test
+./host_build/i2c_test
 
-cmake --build build --target crc_test
-./build/crc_test
+cmake --build host_build --target spi_test
+./host_build/spi_test
+
+cmake --build host_build --target crc_test
+./host_build/crc_test
 
 #Hardware Testing
+rm -rf build_gpio
+west build -b nucleo_f446re zephyr_app -d build_gpio -- -DCONF_FILE=config/prj_gpio.conf
+west flash --build-dir build_gpio
+minicom -D /dev/ttyACM0 -b 921600
+
+rm -rf build_uart
+west build -b nucleo_f446re zephyr_app -d build_uart -- -DCONF_FILE=config/prj_uart.conf
+west flash --build-dir build_uart
+minicom -D /dev/ttyACM0 -b 921600
+
 rm -rf build_i2c
 west build -b nucleo_f446re zephyr_app -d build_i2c -- -DCONF_FILE=config/prj_i2c.conf
 west flash --build-dir build_i2c
+minicom -D /dev/ttyACM0 -b 921600
 
 rm -rf build_spi
 west build -b nucleo_f446re zephyr_app -d build_spi -- -DCONF_FILE=config/prj_spi.conf
 west flash --build-dir build_spi
+minicom -D /dev/ttyACM0 -b 921600
+filter mavg
+filter median
+
+rm -rf build_crc16
+west build -b nucleo_f446re zephyr_app -d build_crc16 --pristine -- -DCONF_FILE="config/prj.conf;config/prj_crc_loopback.conf"
+
+west flash --build-dir build_crc16
+
+# Wait a few seconds for boot, then test
+python3 scripts/loopback_test.py --port /dev/ttyACM0 --baud 921600 --crc 16
+
+
 ```
 ## Quick Start — Flash to NUCLEO-F446RE
 

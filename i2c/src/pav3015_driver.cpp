@@ -19,29 +19,38 @@ PAV3015Driver::PAV3015Driver(uint8_t addr, uint8_t range)
 
 bool PAV3015Driver::setRange(uint8_t range)
 {
+    if (range != RANGE_7MPS && range != RANGE_15MPS)
+    {
+        return false;
+    }
     range_ = range;
-    return bus_.writeReg(pav3015_reg::CTRL, range);
+
+    uint8_t buf[5] = {};
+    if (!bus_.readBytes(buf, 5))
+    {
+        return false;
+    }
+    return validateChecksum(buf, 5);
 }
 
 int32_t PAV3015Driver::readRaw()
 {
-    uint8_t status = 0;
-    if (!bus_.readRegs(pav3015_reg::STATUS, &status, 1)) {
-        LOG_ERR("PAV3015 status read failed");
-        raw_valid_ = false;
-        raw_ = INT32_MIN;
-        return INT32_MIN;
-    }
-
-    uint8_t buf[2] = {};
-    if (!bus_.readRegs(pav3015_reg::DATA_H, buf, 2)) {
+    uint8_t buf[5] = {};
+    if (!bus_.readBytes(buf, 5)) {
         LOG_ERR("PAV3015 data read failed");
         raw_valid_ = false;
         raw_ = INT32_MIN;
         return INT32_MIN;
     }
 
-    raw_ = ((static_cast<uint16_t>(buf[0]) & 0x0F) << 8) | buf[1];
+    if (!validateChecksum(buf, 5)) {
+        LOG_ERR("PAV3015 checksum validation failed");
+        raw_valid_ = false;
+        raw_ = INT32_MIN;
+        return INT32_MIN;
+    }
+
+    raw_ = (static_cast<uint32_t>(buf[1]) << 8) | buf[2];
     raw_valid_ = true;
 
     return raw_;
@@ -78,10 +87,10 @@ bool PAV3015Driver::validateChecksum(const uint8_t *buf, size_t len)
     }
 
     uint8_t sum = 0;
-    for (size_t i = 1; i < len; ++i)
+    for (size_t i = 0; i < len; ++i)
     {
         sum += buf[i];
     }
 
-    return buf[0] == sum;
+    return sum == 0;
 }

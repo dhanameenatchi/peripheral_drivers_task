@@ -11,6 +11,7 @@ void gpio_app_init(void);
 #if MODULE_UART
 #ifdef CONFIG_UART_ASYNC_API
 void uart_dma_init(void);
+void uart_dma_demo_loop(void);
 #endif
 #endif
 
@@ -30,6 +31,7 @@ void spi_app_sample(void);
 void crc_app_init(void);
 void crc_app_demo(void);
 void crc_loopback_service(void);
+bool crc_is_busy(void);
 #endif
 
 int main(void) {
@@ -89,7 +91,7 @@ int main(void) {
     uint32_t last_25hz_ticks = 0;   // 40 ms interval (LPS22HB)
     uint32_t last_10hz_ticks = 0;   // 100 ms interval (BME280 + SHTC3, SPI ADS1118)
     uint32_t last_0_5hz_ticks = 0;  // 2000 ms interval (CRC demo)
-    constexpr uint32_t SPI_SAMPLE_PERIOD_MS = 500;
+    constexpr uint32_t SPI_SAMPLE_PERIOD_MS = (100*8);
 
     LOG_INF("Cooperative scheduler started.");
 
@@ -98,13 +100,13 @@ int main(void) {
 
 #if MODULE_I2C
         // 50 Hz Task: PAV3015 Flow Sensor (20 ms)
-        if (now - last_50hz_ticks >= 20) {
+        if (now - last_50hz_ticks >= (20 *8)) {
             last_50hz_ticks = now;
             i2c_app_sample_pav();
         }
 
         // 25 Hz Task: LPS22HB Airway Pressure (40 ms)
-        if (now - last_25hz_ticks >= 40) {
+        if (now - last_25hz_ticks >= (40 * 8)) {
             last_25hz_ticks = now;
             i2c_app_sample_lps();
         }
@@ -125,21 +127,31 @@ int main(void) {
         // 0.5 Hz Task: CRC Frame Codec Demo (2000 ms)
         if (now - last_0_5hz_ticks >= 2000) {
             last_0_5hz_ticks = now;
-            crc_app_demo();
+            // crc_app_demo();
         }
 
         // Continuous Loopback Service (Non-blocking)
         crc_loopback_service();
 #endif
 
-        // Cooperative yield
+        // Cooperative yield — only sleep if not in the middle of receiving a CRC frame
+#if MODULE_CRC
+        if (!crc_is_busy()) {
+            k_msleep(1);
+        }
+#else
         k_msleep(1);
+#endif
     }
 #else
-    // If only GPIO/UART are built, yield/sleep continuously in background
+    // If only GPIO/UART are built, run the UART DMA demo loop
+#if MODULE_UART && defined(CONFIG_UART_ASYNC_API)
+    uart_dma_demo_loop();  // never returns — streams packets + LED heartbeat
+#else
     while (true) {
         k_msleep(1000);
     }
+#endif
 #endif
 
     return 0;

@@ -31,7 +31,7 @@ TEST_F(I2CTest, CSVOutputVerification) {
     setReg(0x76, 0xFC, 0x00); // 0 C
     setReg(0x76, 0xF7, 0x01);
     setReg(0x76, 0xF8, 0x00);
-    setReg(0x76, 0xF9, 0x00); // 1656.70 hPa (under updated calibration)
+    setReg(0x76, 0xF9, 0x00); // 1658.90 hPa (under updated calibration)
     setReg16_BE(0x76, 0xFD, 1024); // 5.7% (under updated calibration)
 
     // SHTC3: Address 0x70
@@ -43,14 +43,15 @@ TEST_F(I2CTest, CSVOutputVerification) {
 
     // 4. Clear fake UART stream and sample each sensor group
     FakeUart::clear();
-    i2c_app_sample();
+    i2c_app_sample_pav();
+    i2c_app_sample_lps();
+    i2c_app_sample_ambient();
 
     // 5. Verify CSV output contains expected sensor data
     std::string output = FakeUart::str();
     
-    // TODO: Uncomment these when full-system build integrates PAV, LPS, and BME sensors
-    // EXPECT_NE(output.find("PAV,987654,2415,5.000\r\n"), std::string::npos);
-    // EXPECT_NE(output.find("LPS,987654,1.0000,25.00\r\n"), std::string::npos);
-    // EXPECT_NE(output.find("BME,987654,0.00,1.00,1.0\r\n"), std::string::npos);
-    EXPECT_NE(output.find("SHT,987654,42.50,50.0\r\n"), std::string::npos);
+    EXPECT_NE(output.find("PAV,987654,2187,5.000"), std::string::npos);
+    EXPECT_NE(output.find("LPS,987654,1.00,25.00"), std::string::npos);
+    EXPECT_NE(output.find("BME,987654,0.00,1658.90,5.7"), std::string::npos);
+    EXPECT_NE(output.find("SHT,987654,42.50,50.0"), std::string::npos);
 }

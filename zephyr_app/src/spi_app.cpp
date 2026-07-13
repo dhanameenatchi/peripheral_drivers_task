@@ -76,14 +76,6 @@ static void uart_irq_handler(const struct device* dev, void* /* user_data */) {
 void spi_app_init() {
     LOG_INF("====================================================");
     LOG_INF("SPI ADS1118 ADC Module Initialized");
-    // LOG_INF("SCK  : PA5 (D13)");
-    // LOG_INF("MISO : PA6 (D12)");
-    // LOG_INF("MOSI : PA7 (D11)");
-    // LOG_INF("CS   : PB6 (D10)");
-    // LOG_INF("Mode : SPI Mode 1 (CPOL=0, CPHA=1)");
-    // LOG_INF("Word : 16-bit");
-    // LOG_INF("Speed: 1 MHz");
-    // LOG_INF("Default filter: MovingAverage(8)");
     LOG_INF("Commands: 'filter mavg' / 'filter median'");
     LOG_INF("====================================================");
 

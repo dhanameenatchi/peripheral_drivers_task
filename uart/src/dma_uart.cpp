@@ -8,7 +8,7 @@
 // Static Assertions
 // ---------------------------------------------------------------------------
 static_assert(std::is_trivially_copyable_v<LogPacket>, "LogPacket must be trivially copyable");
-static_assert(sizeof(LogPacket) == 40, "LogPacket layout must be exactly 40 bytes");
+static_assert(sizeof(LogPacket) == 72, "LogPacket layout must be exactly 72 bytes");
 
 static_assert(static_cast<uint8_t>(LogLevel::DEBUG) == 0, "LogLevel::DEBUG enum order mismatch");
 static_assert(static_cast<uint8_t>(LogLevel::INFO)  == 1, "LogLevel::INFO enum order mismatch");

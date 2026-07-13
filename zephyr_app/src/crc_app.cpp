@@ -11,7 +11,7 @@
 #include "frame_codec.hpp"
 
 LOG_MODULE_REGISTER(crc_app, LOG_LEVEL_INF);
-
+static volatile uint32_t g_irq_count = 0;
 // ── Both CRC strategies ──────────────────────────────────────────────────────
 static Crc16Ccitt g_crc16;
 static Crc8Maxim  g_crc8;
@@ -20,9 +20,19 @@ static Crc8Maxim  g_crc8;
 static FrameCodec g_codec16(g_crc16);
 static FrameCodec g_codec8(g_crc8);
 
+// ── Build-time selected active strategy & codec ──────────────────────────────
+#ifdef CONFIG_CRC_STRATEGY_CRC8
+static const ICrcStrategy* const g_active_strategy = &g_crc8;
+static const FrameCodec* const g_active_codec = &g_codec8;
+#else
+static const ICrcStrategy* const g_active_strategy = &g_crc16;
+static const FrameCodec* const g_active_codec = &g_codec16;
+#endif
+
 // ── Demo state ───────────────────────────────────────────────────────────────
-static const ICrcStrategy* g_active_crc = &g_crc16;
+#ifndef CONFIG_CRC_LOOPBACK_MODE
 static uint32_t g_demo_cycle = 0;
+#endif
 
 // ── UART loopback state ──────────────────────────────────────────────────────
 static const struct device* g_uart_dev = nullptr;
@@ -39,8 +49,12 @@ enum class RxState : uint8_t {
     WAIT_BODY,      // accumulating cmd + payload + CRC
 };
 static volatile RxState g_rx_state = RxState::WAIT_SOF;
-static size_t  g_rx_expected = 0;  // SOF + Len + Cmd + Payload
+static volatile size_t  g_rx_expected_total = 0;  // total frame bytes including CRC
 static volatile uint32_t g_last_rx_time = 0;
+
+// ISR→main-loop handoff: ISR sets this flag when a complete frame is buffered
+static volatile bool   g_rx_frame_ready = false;
+static volatile size_t g_rx_frame_len   = 0;
 
 // ---------------------------------------------------------------------------
 // Helper: send raw binary bytes over UART (blocking, for loopback response)
@@ -55,15 +69,30 @@ static void uart_send_raw(const uint8_t* data, size_t len) {
 // ---------------------------------------------------------------------------
 // UART IRQ handler — state-machine byte accumulator
 // ---------------------------------------------------------------------------
+static const char hex_lut[] = "0123456789ABCDEF";
+
 static void uart_irq_handler(const struct device* dev, void* /* user_data */) {
+    // uart_poll_out(dev, '.');
     uart_irq_update(dev);
+    (void)uart_err_check(dev);
+
     if (!uart_irq_rx_ready(dev)) {
         return;
     }
-
     uint8_t c;
     while (uart_fifo_read(dev, &c, 1) == 1) {
+        g_irq_count++;
+        // DIAG: print each received byte as 2-char hex
+        // uart_poll_out(dev, hex_lut[(c >> 4) & 0x0F]);
+        // uart_poll_out(dev, hex_lut[c & 0x0F]);
+
         g_last_rx_time = k_uptime_get_32();
+
+        // If a frame is pending main-loop processing, discard incoming bytes
+        if (g_rx_frame_ready) {
+            continue;
+        }
+
         switch (g_rx_state) {
         case RxState::WAIT_SOF:
             if (c == Frame::SOF) {
@@ -80,7 +109,14 @@ static void uart_irq_handler(const struct device* dev, void* /* user_data */) {
                 g_rx_state = RxState::WAIT_SOF;
                 g_rx_idx = 0;
             } else {
-                g_rx_expected = 3 + c;
+                // Pre-compute total expected bytes (header + payload + CRC)
+                // using the build-time CRC size constant to avoid virtual
+                // calls from ISR context.
+#ifdef CONFIG_CRC_STRATEGY_CRC8
+                g_rx_expected_total = 3 + c + 1;  // CRC8 = 1 byte
+#else
+                g_rx_expected_total = 3 + c + 2;  // CRC16 = 2 bytes
+#endif
                 g_rx_state = RxState::WAIT_BODY;
             }
             break;
@@ -89,26 +125,10 @@ static void uart_irq_handler(const struct device* dev, void* /* user_data */) {
             if (g_rx_idx < sizeof(g_rx_buf)) {
                 g_rx_buf[g_rx_idx++] = c;
             }
-            // Check CRC8-Maxim at (expected + 1) bytes
-            if (g_rx_idx == g_rx_expected + 1) {
-                auto decoded = g_codec8.decode(g_rx_buf, g_rx_idx);
-                if (decoded.has_value()) {
-                    uart_send_raw(g_rx_buf, g_rx_idx);
-                    g_rx_state = RxState::WAIT_SOF;
-                    g_rx_idx = 0;
-                    break;
-                }
-            }
-            // Check CRC16-CCITT at (expected + 2) bytes
-            if (g_rx_idx == g_rx_expected + 2) {
-                auto decoded = g_codec16.decode(g_rx_buf, g_rx_idx);
-                if (decoded.has_value()) {
-                    uart_send_raw(g_rx_buf, g_rx_idx);
-                } else {
-                    if (!g_loopback_active) {
-                        LOG_WRN("CRC ERROR - frame dropped");
-                    }
-                }
+            // Signal main loop when all expected bytes have arrived
+            if (g_rx_idx >= g_rx_expected_total) {
+                g_rx_frame_len   = g_rx_idx;
+                g_rx_frame_ready = true;  // handoff to main loop
                 g_rx_state = RxState::WAIT_SOF;
                 g_rx_idx = 0;
             }
@@ -153,7 +173,7 @@ void crc_app_init() {
     LOG_INF("Frame format : [SOF 0xAA | Len | Cmd | Payload <=32B | CRC]");
     LOG_INF("Strategy 1   : CRC16-CCITT (poly=0x1021, init=0xFFFF)");
     LOG_INF("Strategy 2   : CRC8-Maxim  (poly=0x31,   init=0x00)");
-    LOG_INF("Active       : %s", g_active_crc->name());
+    LOG_INF("Active       : %s", g_active_strategy->name());
     LOG_INF("====================================================");
 
     // ── Self-test: encode → decode round-trip ────────────────────────────────
@@ -163,8 +183,8 @@ void crc_app_init() {
     __builtin_memcpy(f.payload, "ALARM", 5);
 
     uint8_t buf[FrameCodec::MAX_FRAME_BYTES];
-    size_t n = g_codec16.encode(f, buf, sizeof(buf));
-    auto decoded = g_codec16.decode(buf, n);
+    size_t n = g_active_codec->encode(f, buf, sizeof(buf));
+    auto decoded = g_active_codec->decode(buf, n);
 
     if (decoded.has_value()) {
         LOG_INF("CRC self-test PASSED (cmd=0x%02X, payload=%u bytes)",
@@ -177,24 +197,15 @@ void crc_app_init() {
 
 // =============================================================================
 // crc_app_demo — called periodically in Demo Mode
-// Alternates between CRC16-CCITT and CRC8-Maxim each cycle
+// Guarded by CRC_LOOPBACK_MODE config to prevent console log corruption
 // =============================================================================
 void crc_app_demo() {
+#ifndef CONFIG_CRC_LOOPBACK_MODE
     uint32_t ts = k_uptime_get_32();
-
-    // ── Swap CRC strategy every cycle ────────────────────────────────────────
-    if (g_demo_cycle % 2 == 0) {
-        g_active_crc = &g_crc16;
-    } else {
-        g_active_crc = &g_crc8;
-    }
-    // Reconstruct codec with active strategy (placement-new on static storage)
-    static uint8_t codec_mem[sizeof(FrameCodec)];
-    FrameCodec* codec = new (codec_mem) FrameCodec(*g_active_crc);
 
     LOG_INF("====================================================");
     LOG_INF("[Cycle %u] Timestamp: %u ms", g_demo_cycle, ts);
-    LOG_INF("Active CRC Strategy: %s", g_active_crc->name());
+    LOG_INF("Active CRC Strategy: %s", g_active_strategy->name());
     LOG_INF("----------------------------------------------------");
 
     // ── Step 1: Build a sample frame ─────────────────────────────────────────
@@ -210,7 +221,7 @@ void crc_app_demo() {
 
     // ── Step 2: Encode ───────────────────────────────────────────────────────
     uint8_t buf[FrameCodec::MAX_FRAME_BYTES];
-    size_t n = codec->encode(f, buf, sizeof(buf));
+    size_t n = g_active_codec->encode(f, buf, sizeof(buf));
 
     if (n == 0) {
         LOG_ERR("  Encode FAILED");
@@ -222,7 +233,7 @@ void crc_app_demo() {
 
     // ── Step 3: Decode the valid frame ───────────────────────────────────────
     LOG_INF("[DECODE] Valid frame:");
-    auto decoded = codec->decode(buf, n);
+    auto decoded = g_active_codec->decode(buf, n);
 
     if (decoded.has_value()) {
         LOG_INF("  CRC verify    : PASS");
@@ -243,7 +254,7 @@ void crc_app_demo() {
 
     print_hex("  Corrupted frame", corrupted, n);
 
-    auto bad_decode = codec->decode(corrupted, n);
+    auto bad_decode = g_active_codec->decode(corrupted, n);
     if (!bad_decode.has_value()) {
         LOG_INF("  CRC verify    : FAIL (error correctly detected)");
     } else {
@@ -253,33 +264,95 @@ void crc_app_demo() {
     LOG_INF("====================================================");
 
     ++g_demo_cycle;
+#endif
 }
 
 // =============================================================================
-// crc_loopback_service — called periodically in Loopback Mode
-// Performs only binary UART loopback
+// crc_loopback_service — called periodically from main loop
+// ISR accumulates bytes into g_rx_buf and sets g_rx_frame_ready.
+// This function performs decode + echo in thread context (safe for
+// virtual dispatch and uart_poll_out).
 // =============================================================================
 void crc_loopback_service() {
     static bool initialized = false;
+
     if (!initialized) {
         g_loopback_active = true;
         g_uart_dev = DEVICE_DT_GET(DT_NODELABEL(usart2));
-        if (device_is_ready(g_uart_dev)) {
-            uart_irq_callback_set(g_uart_dev, uart_irq_handler);
-            uart_irq_rx_enable(g_uart_dev);
-        }
+
+        bool ready = device_is_ready(g_uart_dev);
+
+        // Direct uart_poll_out diagnostic (bypasses disabled log backend)
+        // {
+        //     const char* msg = ready ? "LOOPBACK_READY\r\n"
+        //                             : "LOOPBACK_NOT_READY\r\n";
+        //     for (const char* p = msg; *p; ++p) {
+        //         uart_poll_out(g_uart_dev, *p);
+        //     }
+        // }
+
+        if (ready) {
+    // 1. Disable RX interrupts during configuration setup
+    uart_irq_rx_disable(g_uart_dev);
+
+    // 2. Clear any stale bytes lingering in the hardware FIFO
+    uint8_t dummy;
+    while (uart_fifo_read(g_uart_dev, &dummy, 1) > 0) {
+        // Purging buffer
+    }
+
+    // 3. Set the callback using standard interrupt-driven API
+    uart_irq_callback_set(g_uart_dev, uart_irq_handler);
+    // Direct output verification message
+    // {
+    //     char buf[24];
+    //     int n = snprintf(buf, sizeof(buf), "CB_RC=%d\r\n", cb_rc);
+    //     for (int i = 0; i < n; ++i) {
+    //         uart_poll_out(g_uart_dev, buf[i]);
+    //     }
+    // }
+
+    // 4. CRITICAL: Trigger the internal interrupt routing
+    uart_irq_rx_enable(g_uart_dev);
+}
         initialized = true;
     }
 
-    // Timeout reset: if rx has been idle for > 50 ms in the middle of a frame, reset.
-    if (g_rx_state != RxState::WAIT_SOF && (k_uptime_get_32() - g_last_rx_time) > 50) {
-        g_rx_state = RxState::WAIT_SOF;
+    // ── Process completed frame handed off by ISR ────────────────────────────
+    if (g_rx_frame_ready) {
+        size_t len = g_rx_frame_len;
+
+        // Verify the CRC of the received frame before echoing
+        if (g_active_codec->decode(g_rx_buf, len).has_value()) {
+            uart_send_raw(g_rx_buf, len);
+        }
+
+        // Release buffer for next frame atomically
+        unsigned int key = irq_lock();
+        g_rx_frame_ready = false;
+        g_rx_frame_len = 0;
+        g_rx_expected_total = 0;
         g_rx_idx = 0;
+        g_rx_state = RxState::WAIT_SOF;
+        irq_unlock(key);
     }
 
-    // No sleep here: handled cooperatively by main scheduler loop.
+    // Timeout reset: if rx has been idle for > 200 ms in the middle of a frame, reset.
+    if (g_rx_state != RxState::WAIT_SOF && (k_uptime_get_32() - g_last_rx_time) > 200) {
+        unsigned int key = irq_lock();
+        // Double check after lock
+        if (g_rx_state != RxState::WAIT_SOF && (k_uptime_get_32() - g_last_rx_time) > 200) {
+            g_rx_state = RxState::WAIT_SOF;
+            g_rx_idx = 0;
+        }
+        irq_unlock(key);
+    }
 }
 
 FrameCodec& crc_get_codec() {
-    return g_codec16;
+    return const_cast<FrameCodec&>(*g_active_codec);
+}
+
+bool crc_is_busy(void) {
+    return g_rx_state != RxState::WAIT_SOF;
 }

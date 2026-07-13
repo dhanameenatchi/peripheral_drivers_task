@@ -45,3 +45,15 @@ TEST_F(I2CTest, Factory_CreatesLPS22HB_WritesODR_RecordsTransaction) {
     }
     EXPECT_TRUE(found_odr_write);
 }
+
+TEST_F(I2CTest, ISensor_VirtualDestructor) {
+    std::unique_ptr<ISensor> s = SensorFactory::create(SensorKind::BME280);
+    ISensor* raw = s.release();
+    delete raw;
+}
+
+TEST_F(I2CTest, Factory_CreateInvalidKind_ReturnsNullptr) {
+    auto s = SensorFactory::create(static_cast<SensorKind>(99));
+    EXPECT_EQ(s, nullptr);
+}
+

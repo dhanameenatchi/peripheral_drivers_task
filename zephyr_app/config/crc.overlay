@@ -1,0 +1,5 @@
+// Custom devicetree overlay for CRC module to disable DMA on USART2
+&usart2 {
+    /delete-property/ dmas;
+    /delete-property/ dma-names;
+};
